@@ -1,15 +1,20 @@
-DIRECTIONS = ['forward', 'reverse']
+DIRECTIONS = ['forward', 'reverse', "merge"]
+TRIMS = ["notrim", "trim"]
 SEARCHES = ['exhaustive', 'default']
 
 # note that current directory is mounted as /data in the container
-qiime = "docker run -t -i -v $(pwd):/data qiime2/core:2018.2 qiime"
+qiime = "docker run -t -i -v $(pwd):/data qiime2/core:2018.11 qiime"
+
+configfile: "config.yaml"
 
 rule all:
     input:
-        expand("{direction}-derep-table.tsv", direction=DIRECTIONS),
+        "forward-trim-single-derep-table.tsv",
+        "merge-trim-pair-derep-table.tsv",
+        # expand("{direction}-{trim}-derep-table.tsv", direction=DIRECTIONS, trim=TRIMS),
         #expand("{direction}-derep-usearch-{search}.b6", direction=DIRECTIONS, search=SEARCHES)
-        expand("{direction}-derep-usearch-default-taxonomy.tsv", direction=DIRECTIONS),
-        expand("{direction}-derep-rdp.tsv", direction=DIRECTIONS)
+        # expand("{direction}-derep-usearch-default-taxonomy.tsv", direction=DIRECTIONS),
+        # expand("{direction}-derep-rdp.tsv", direction=DIRECTIONS)
 
 rule rdp:
     output: "{x}-rdp.tsv"
@@ -53,8 +58,8 @@ rule export_table:
     input: "{x}-table.qza"
     shell:
         qiime + " tools export"
-        " {input}"
-        " --output-dir ."
+        " --input-path {input}"
+        " --output-path ./"
         " && mv feature-table.biom {output}"
 
 rule deblur:
@@ -134,23 +139,87 @@ rule dereplicate:
         " --o-dereplicated-table {output.table}"
         " --o-dereplicated-sequences {output.seqs}"
 
-rule filter:
+rule filter_pair:
     output:
-        seqs = "{x}-filter.qza",
-        stats = "{x}-filter-stats.qza"
-    input: "{x}-demux.qza"
+        seqs = "{x}-pair-filter.qza",
+        stats = "{x}-pair-filter-stats.qza"
+    input: "{x}-pair-demux.qza"
+    shell:
+        qiime + " quality-filter q-score-joined"
+        " --i-demux {input}"
+        " --o-filtered-sequences {output.seqs}"
+        " --o-filter-stats {output.stats}"
+
+rule filter_single:
+    output:
+        seqs = "{x}-single-filter.qza",
+        stats = "{x}-single-filter-stats.qza"
+    input: "{x}-single-demux.qza"
     shell:
         qiime + " quality-filter q-score"
         " --i-demux {input}"
         " --o-filtered-sequences {output.seqs}"
         " --o-filter-stats {output.stats}"
 
-rule import_fastq:
-    output: "{x}-demux.qza"
-    input: "{x}-manifest.txt"
+rule trim_forward:
+    output: "forward-trim-single-demux.qza"
+    input: "forward-notrim-single-demux.qza"
+    params: primer=config["forward-primer"]
+    shell:
+        qiime + " cutadapt trim-single"
+        " --i-demultiplexed-sequences {input}"
+        " --p-front {params.primer}"
+        " --o-trimmed-sequences {output}"
+
+rule trim_reverse:
+    output: "reverse-trim-single-demux.qza"
+    input: "reverse-notrim-single-demux.qza"
+    params: primer=config["reverse-primer"]
+    shell:
+        qiime + " cutadapt trim-single"
+        " --i-demultiplexed-sequences {input}"
+        " --p-front {params.primer}"
+        " --o-trimmed-sequences {output}"
+
+rule trim_pair:
+    output: "merge-trim-pair-demux.qza"
+    input: "merge-notrim-pair-demux.qza"
+    params:
+        forward_primer = config["forward-primer"],
+        reverse_primer = config["reverse-primer"]
+    shell:
+        qiime + " cutadapt trim-paired"
+        " --i-demultiplexed-sequences {input}"
+        " --p-front-f {params.forward_primer}"
+        " --p-front-r {params.reverse_primer}"
+        " --o-trimmed-sequences {output}"
+
+rule import_single:
+    output: "{x}-notrim-single-demux.qza"
+    input: "{x}-single-manifest.txt"
     shell:
         qiime + " tools import"
         " --type 'SampleData[SequencesWithQuality]'"
         " --input-path {input}"
         " --output-path {output}"
-        " --source-format SingleEndFastqManifestPhred33"
+        " --input-format SingleEndFastqManifestPhred33"
+
+rule import_pair:
+    output: "{x}-notrim-pair-demux.qza"
+    input: "{x}-pair-manifest.txt"
+    shell: qiime + " tools import"
+        " --type 'SampleData[PairedEndSequencesWithQuality]'"
+        " --input-path {input}"
+        " --output-path {output}"
+        " --input-format PairedEndFastqManifestPhred33"
+
+rule merge_manifest:
+    input: forward="forward-single-manifest.txt", reverse="reverse-single-manifest.txt"
+    output: "merge-pair-manifest.txt"
+    shell:
+        # concatenate manifests
+        "cat {input.forward} {input.reverse}"
+        # get rid of "sample-id" lines (except the first one)
+        # (use double braces to escape snakemake)
+        r" | awk '/^sample-id/ && FNR > 1 {{next}} {{print $0}}'"
+        " > {output}"

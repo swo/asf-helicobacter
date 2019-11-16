@@ -1,2 +1,6 @@
 raw/
+*.qza
 *.txt
+*.tsv
+.snakemake/
+.*.swp

@@ -1,5 +1,0 @@
-sample-id,absolute-filepath,direction
-heli,/data/raw/heli_reverse.fastq.gz,reverse
-noheli,/data/raw/noheli_reverse.fastq.gz,reverse
-untrimmed-heli,/data/raw/untrimmed/heli_reverse.fastq.gz,reverse
-untrimmed-noheli,/data/raw/untrimmed/noheli_reverse.fastq.gz,reverse

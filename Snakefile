@@ -1,6 +1,13 @@
-DIRECTIONS = ['forward', 'reverse', "merge"]
-TRIMS = ["notrim", "trim"]
-SEARCHES = ['exhaustive', 'default']
+import glob, os.path
+
+LIBS = set([re.search("notrim/(.*)_R1.fastq", x).group(1) for x in glob.glob("notrim/*_R1.fastq")])
+
+ALL_FILES = expand("{folder}/{lib}_R{direct}.fastq", folder=["notrim", "trim"], lib=LIBS, direct=["1", "2"]) + \
+    expand("{folder}/{lib}_R1.fastq", folder=["merge-notrim", "merge-trim"], lib=LIBS)
+
+# DIRECTIONS = ['forward', 'reverse', "merge"]
+# TRIMS = ["notrim", "trim"]
+# SEARCHES = ['exhaustive', 'default']
 
 # note that current directory is mounted as /data in the container
 qiime = "docker run -t -i -v $(pwd):/data qiime2/core:2018.11 qiime"
@@ -9,13 +16,38 @@ configfile: "config.yaml"
 
 rule all:
     input:
-        # "forward-trim-single-derep-table.tsv",
-        # "merge-trim-pair-derep-table.tsv",
-        "merge-trim-demux.qza"
+        "manifest.txt"
         # expand("{direction}-{trim}-derep-table.tsv", direction=DIRECTIONS, trim=TRIMS),
         #expand("{direction}-derep-usearch-{search}.b6", direction=DIRECTIONS, search=SEARCHES)
         # expand("{direction}-derep-usearch-default-taxonomy.tsv", direction=DIRECTIONS),
         # expand("{direction}-derep-rdp.tsv", direction=DIRECTIONS)
+
+rule clean:
+    shell: "rm trim/* merge-trim/* merge-notrim/* manifest.txt"
+
+rule write_manifest:
+    output: "manifest.txt"
+    input: ALL_FILES
+    script: "write_manifest.py"
+
+rule merge:
+    output: "merge-{x}/{y}_R1.fastq"
+    input: forward="{x}/{y}_R1.fastq", reverse="{x}/{y}_R2.fastq"
+    script: "merge.py"
+
+rule trim_forward:
+    output: "trim/{x}_R1.fastq"
+    input: "notrim/{x}_R1.fastq"
+    params: primer=config["forward-primer"]
+    script: "trim.py"
+
+rule trim_reverse:
+    output: "trim/{x}_R2.fastq"
+    input: "notrim/{x}_R2.fastq"
+    params: primer=config["reverse-primer"]
+    script: "trim.py"
+
+#######################################################################
 
 rule rdp:
     output: "{x}-rdp.tsv"
@@ -161,26 +193,6 @@ rule filter_single:
         " --i-demux {input}"
         " --o-filtered-sequences {output.seqs}"
         " --o-filter-stats {output.stats}"
-
-rule trim_forward:
-    output: "forward-trim-demux.qza"
-    input: "forward-notrim-demux.qza"
-    params: primer=config["forward-primer"]
-    shell:
-        qiime + " cutadapt trim-single"
-        " --i-demultiplexed-sequences {input}"
-        " --p-front {params.primer}"
-        " --o-trimmed-sequences {output}"
-
-rule trim_reverse:
-    output: "reverse-trim-single-demux.qza"
-    input: "reverse-notrim-single-demux.qza"
-    params: primer=config["reverse-primer"]
-    shell:
-        qiime + " cutadapt trim-single"
-        " --i-demultiplexed-sequences {input}"
-        " --p-front {params.primer}"
-        " --o-trimmed-sequences {output}"
 
 rule trim_pair_reverse:
     output: "merge-trim-demux.qza"

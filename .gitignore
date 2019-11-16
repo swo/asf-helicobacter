@@ -4,3 +4,4 @@ raw/
 *.tsv
 .snakemake/
 .*.swp
+*.fastq

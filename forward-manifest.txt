@@ -1,3 +1,0 @@
-sample-id,absolute-filepath,direction
-heli,/data/raw/heli_forward.fastq.gz,forward
-noheli,/data/raw/noheli_forward.fastq.gz,forward

@@ -9,8 +9,9 @@ configfile: "config.yaml"
 
 rule all:
     input:
-        "forward-trim-single-derep-table.tsv",
-        "merge-trim-pair-derep-table.tsv",
+        # "forward-trim-single-derep-table.tsv",
+        # "merge-trim-pair-derep-table.tsv",
+        "merge-trim-demux.qza"
         # expand("{direction}-{trim}-derep-table.tsv", direction=DIRECTIONS, trim=TRIMS),
         #expand("{direction}-derep-usearch-{search}.b6", direction=DIRECTIONS, search=SEARCHES)
         # expand("{direction}-derep-usearch-default-taxonomy.tsv", direction=DIRECTIONS),
@@ -162,8 +163,8 @@ rule filter_single:
         " --o-filter-stats {output.stats}"
 
 rule trim_forward:
-    output: "forward-trim-single-demux.qza"
-    input: "forward-notrim-single-demux.qza"
+    output: "forward-trim-demux.qza"
+    input: "forward-notrim-demux.qza"
     params: primer=config["forward-primer"]
     shell:
         qiime + " cutadapt trim-single"
@@ -181,22 +182,29 @@ rule trim_reverse:
         " --p-front {params.primer}"
         " --o-trimmed-sequences {output}"
 
-rule trim_pair:
-    output: "merge-trim-pair-demux.qza"
-    input: "merge-notrim-pair-demux.qza"
-    params:
-        forward_primer = config["forward-primer"],
-        reverse_primer = config["reverse-primer"]
+rule trim_pair_reverse:
+    output: "merge-trim-demux.qza"
+    input: "merge-trimforwardonly-demux.qza"
+    params: primer=config["reverse-primer"]
     shell:
-        qiime + " cutadapt trim-paired"
+        qiime + " cutadapt trim-single"
         " --i-demultiplexed-sequences {input}"
-        " --p-front-f {params.forward_primer}"
-        " --p-front-r {params.reverse_primer}"
+        " --p-adapter {params.primer}"
         " --o-trimmed-sequences {output}"
 
-rule import_single:
-    output: "{x}-notrim-single-demux.qza"
-    input: "{x}-single-manifest.txt"
+rule trim_pair_forward:
+    output: "merge-trimforwardonly-demux.qza"
+    input: "merge-notrim-demux.qza"
+    params: primer=config["forward-primer"]
+    shell:
+        qiime + " cutadapt trim-single"
+        " --i-demultiplexed-sequences {input}"
+        " --p-front {params.primer}"
+        " --o-trimmed-sequences {output}"
+
+rule import:
+    output: "{x}-notrim-demux.qza"
+    input: "{x}-manifest.txt"
     shell:
         qiime + " tools import"
         " --type 'SampleData[SequencesWithQuality]'"
@@ -204,22 +212,7 @@ rule import_single:
         " --output-path {output}"
         " --input-format SingleEndFastqManifestPhred33"
 
-rule import_pair:
-    output: "{x}-notrim-pair-demux.qza"
-    input: "{x}-pair-manifest.txt"
-    shell: qiime + " tools import"
-        " --type 'SampleData[PairedEndSequencesWithQuality]'"
-        " --input-path {input}"
-        " --output-path {output}"
-        " --input-format PairedEndFastqManifestPhred33"
-
 rule merge_manifest:
-    input: forward="forward-single-manifest.txt", reverse="reverse-single-manifest.txt"
-    output: "merge-pair-manifest.txt"
-    shell:
-        # concatenate manifests
-        "cat {input.forward} {input.reverse}"
-        # get rid of "sample-id" lines (except the first one)
-        # (use double braces to escape snakemake)
-        r" | awk '/^sample-id/ && FNR > 1 {{next}} {{print $0}}'"
-        " > {output}"
+    input: forward="forward-manifest.txt", reverse="reverse-manifest.txt"
+    output: "merge-manifest.txt"
+    script: "merge-pairs.py"

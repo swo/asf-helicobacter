@@ -1,9 +1,10 @@
 import glob, os.path
 
 LIBS = set([re.search("notrim/(.*)_R1.fastq", x).group(1) for x in glob.glob("notrim/*_R1.fastq")])
-
 ALL_FILES = expand("{folder}/{lib}_R{direct}.fastq", folder=["notrim", "trim"], lib=LIBS, direct=["1", "2"]) + \
     expand("{folder}/{lib}_R1.fastq", folder=["merge-notrim", "merge-trim"], lib=LIBS)
+GROUPS = expand("{group}-{direction}", group=["trim", "notrim"], direction=["forward", "reverse"]) + \
+   expand("{group}-forward", group=["merge-trim", "merge-notrim"])
 
 # DIRECTIONS = ['forward', 'reverse', "merge"]
 # TRIMS = ["notrim", "trim"]
@@ -16,17 +17,79 @@ configfile: "config.yaml"
 
 rule all:
     input:
-        "manifest.txt"
+        "merge-trim-forward-derep-table.tsv"
         # expand("{direction}-{trim}-derep-table.tsv", direction=DIRECTIONS, trim=TRIMS),
         #expand("{direction}-derep-usearch-{search}.b6", direction=DIRECTIONS, search=SEARCHES)
         # expand("{direction}-derep-usearch-default-taxonomy.tsv", direction=DIRECTIONS),
         # expand("{direction}-derep-rdp.tsv", direction=DIRECTIONS)
 
 rule clean:
-    shell: "rm trim/* merge-trim/* merge-notrim/* manifest.txt"
+    shell: "rm trim/* merge-trim/* merge-notrim/* *.txt *.qza *.biom"
+
+rule reference:
+    output: "reference.qza"
+    input: "db/97_otus.fasta"
+    shell:
+        qiime + " tools import"
+        " --input-path {input}"
+        " --output-path {output}"
+        " --type 'FeatureData[Sequence]'"
+
+rule export_tsv:
+    output: "{x}-table.tsv"
+    input: "{x}-table.biom"
+    shell: "biom convert -i {input} -o {output} --to-tsv"
+
+rule export_fasta:
+    output: "{x}-seqs.fa"
+    input: "{x}-seqs.qza"
+    shell:
+        qiime + " tools export"
+        " {input}"
+        " --output-dir ."
+        " && mv dna-sequences.fasta {output}"
+
+rule export_table:
+    output: "{x}-table.biom"
+    input: "{x}-table.qza"
+    shell:
+        qiime + " tools export"
+        " --input-path {input}"
+        " --output-path ./"
+        " && mv feature-table.biom {output}"
+
+rule dereplicate:
+    output:
+        table = "{x}-derep-table.qza",
+        seqs = "{x}-derep-seqs.qza"
+    input: "{x}-filter.qza"
+    shell:
+        qiime + " vsearch dereplicate-sequences"
+        " --i-sequences {input}"
+        " --o-dereplicated-table {output.table}"
+        " --o-dereplicated-sequences {output.seqs}"
+
+rule filter:
+    output: seqs="{x}-filter.qza", stats="{x}-filter-stats.qza"
+    input: "{x}-demux.qza"
+    shell:
+        qiime + " quality-filter q-score"
+        " --i-demux {input}"
+        " --o-filtered-sequences {output.seqs}"
+        " --o-filter-stats {output.stats}"
+
+rule import:
+    output: "{x}-demux.qza"
+    input: "{x}-manifest.txt"
+    shell:
+        qiime + " tools import"
+        " --type 'SampleData[SequencesWithQuality]'"
+        " --input-path {input}"
+        " --output-path {output}"
+        " --input-format SingleEndFastqManifestPhred33"
 
 rule write_manifest:
-    output: "manifest.txt"
+    output: expand("{group}-manifest.txt", group=GROUPS)
     input: ALL_FILES
     script: "write_manifest.py"
 
@@ -71,29 +134,6 @@ rule usearch_exhaustive:
     input: "{x}-seqs.fa"
     params: db = "97_otus.fasta"
     shell: "usearch -usearch_global {input} -db {params.db} -id 0.97 -strand both -blast6out {output} -maxaccepts 0 -maxrejects 0"
-
-rule export_tsv:
-    output: "{x}-table.tsv"
-    input: "{x}-table.biom"
-    shell: "biom convert -i {input} -o {output} --to-tsv"
-
-rule export_fasta:
-    output: "{x}-seqs.fa"
-    input: "{x}-seqs.qza"
-    shell:
-        qiime + " tools export"
-        " {input}"
-        " --output-dir ."
-        " && mv dna-sequences.fasta {output}"
-
-rule export_table:
-    output: "{x}-table.biom"
-    input: "{x}-table.qza"
-    shell:
-        qiime + " tools export"
-        " --input-path {input}"
-        " --output-path ./"
-        " && mv feature-table.biom {output}"
 
 rule deblur:
     output:
@@ -160,71 +200,3 @@ rule reference:
         " --input-path {input}"
         " --output-path {output}"
         " --type 'FeatureData[Sequence]'"
-
-rule dereplicate:
-    output:
-        table = "{x}-derep-table.qza",
-        seqs = "{x}-derep-seqs.qza"
-    input: "{x}-filter.qza"
-    shell:
-        qiime + " vsearch dereplicate-sequences"
-        " --i-sequences {input}"
-        " --o-dereplicated-table {output.table}"
-        " --o-dereplicated-sequences {output.seqs}"
-
-rule filter_pair:
-    output:
-        seqs = "{x}-pair-filter.qza",
-        stats = "{x}-pair-filter-stats.qza"
-    input: "{x}-pair-demux.qza"
-    shell:
-        qiime + " quality-filter q-score-joined"
-        " --i-demux {input}"
-        " --o-filtered-sequences {output.seqs}"
-        " --o-filter-stats {output.stats}"
-
-rule filter_single:
-    output:
-        seqs = "{x}-single-filter.qza",
-        stats = "{x}-single-filter-stats.qza"
-    input: "{x}-single-demux.qza"
-    shell:
-        qiime + " quality-filter q-score"
-        " --i-demux {input}"
-        " --o-filtered-sequences {output.seqs}"
-        " --o-filter-stats {output.stats}"
-
-rule trim_pair_reverse:
-    output: "merge-trim-demux.qza"
-    input: "merge-trimforwardonly-demux.qza"
-    params: primer=config["reverse-primer"]
-    shell:
-        qiime + " cutadapt trim-single"
-        " --i-demultiplexed-sequences {input}"
-        " --p-adapter {params.primer}"
-        " --o-trimmed-sequences {output}"
-
-rule trim_pair_forward:
-    output: "merge-trimforwardonly-demux.qza"
-    input: "merge-notrim-demux.qza"
-    params: primer=config["forward-primer"]
-    shell:
-        qiime + " cutadapt trim-single"
-        " --i-demultiplexed-sequences {input}"
-        " --p-front {params.primer}"
-        " --o-trimmed-sequences {output}"
-
-rule import:
-    output: "{x}-notrim-demux.qza"
-    input: "{x}-manifest.txt"
-    shell:
-        qiime + " tools import"
-        " --type 'SampleData[SequencesWithQuality]'"
-        " --input-path {input}"
-        " --output-path {output}"
-        " --input-format SingleEndFastqManifestPhred33"
-
-rule merge_manifest:
-    input: forward="forward-manifest.txt", reverse="reverse-manifest.txt"
-    output: "merge-manifest.txt"
-    script: "merge-pairs.py"

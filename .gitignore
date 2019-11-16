@@ -1,4 +1,5 @@
 raw/
+*.biom
 *.qza
 *.txt
 *.tsv

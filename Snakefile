@@ -1,13 +1,15 @@
 import glob, os.path
 
+# library names from raw, input files
 LIBS = set([re.search("notrim/(.*)_R1.fastq", x).group(1) for x in glob.glob("notrim/*_R1.fastq")])
-ALL_FILES = expand("{folder}/{lib}_R{direct}.fastq", folder=["notrim", "trim"], lib=LIBS, direct=["1", "2"]) + \
-    expand("{folder}/{lib}_R1.fastq", folder=["merge-notrim", "merge-trim"], lib=LIBS)
-GROUPS = expand("{group}-{direction}", group=["trim", "notrim"], direction=["forward", "reverse"]) + \
-   expand("{group}-forward", group=["merge-trim", "merge-notrim"])
 
-# DIRECTIONS = ['forward', 'reverse', "merge"]
-# TRIMS = ["notrim", "trim"]
+# groups of files expected as outputs
+SINGLE_FILES = expand("{folder}/{lib}_R{direct}.fastq", folder=["notrim", "trim"], lib=LIBS, direct=["1", "2"])
+MERGE_FILES = expand("{folder}/{lib}_R1.fastq", folder=["merge-notrim", "merge-trim"], lib=LIBS)
+ALL_FILES = SINGLE_FILES + MERGE_FILES
+
+GROUPS = expand("{direction}-{trim}", trim=["trim", "notrim"], direction=["forward", "reverse", "merge"])
+
 # SEARCHES = ['exhaustive', 'default']
 
 # note that current directory is mounted as /data in the container
@@ -17,14 +19,14 @@ configfile: "config.yaml"
 
 rule all:
     input:
-        "merge-trim-forward-derep-table.tsv"
+        "merge-trim-derep-table.tsv"
         # expand("{direction}-{trim}-derep-table.tsv", direction=DIRECTIONS, trim=TRIMS),
         #expand("{direction}-derep-usearch-{search}.b6", direction=DIRECTIONS, search=SEARCHES)
         # expand("{direction}-derep-usearch-default-taxonomy.tsv", direction=DIRECTIONS),
         # expand("{direction}-derep-rdp.tsv", direction=DIRECTIONS)
 
 rule clean:
-    shell: "rm trim/* merge-trim/* merge-notrim/* *.txt *.qza *.biom"
+    shell: "rm trim/* merge-trim/* merge-notrim/* *.txt *.qza *.biom *.tsv"
 
 rule reference:
     output: "reference.qza"
@@ -191,12 +193,3 @@ rule open_ref:
         " --o-clustered-table {output.table}"
         " --o-clustered-sequences {output.clusters}"
         " --o-new-reference-sequences {output.seqs}"
-
-rule reference:
-    output: "reference.qza"
-    input: "db/97_otus.fasta"
-    shell:
-        qiime + " tools import"
-        " --input-path {input}"
-        " --output-path {output}"
-        " --type 'FeatureData[Sequence]'"

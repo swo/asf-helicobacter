@@ -6,3 +6,6 @@ raw/
 .snakemake/
 .*.swp
 *.fastq
+*.fa
+*.b6
+*.log

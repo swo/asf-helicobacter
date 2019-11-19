@@ -10,7 +10,7 @@ LIBRARIES = set([re.search("raw/(.*)_R1.fastq", x).group(1) for x in glob.glob("
 # groups of files expected as outputs
 MANIFEST_FILES = expand("{group}/{library}_R1.fastq", group=GROUPS, library=LIBRARIES)
 
-ANALYSES = ["deblur-table.tsv", "deblur-rdp.tsv", "derep-usearch-default-taxonomy.tsv", "derep-usearch-exhaustive-taxonomy.tsv"]
+ANALYSES = ["closedref-taxtable.tsv", "openref-taxtable.tsv", "deblur-table.tsv", "deblur-rdp-tax.tsv"]
 
 # note that current directory is mounted as /data in the container
 qiime = "docker run -t -i -v $(pwd):/data qiime2/core:2019.10 qiime"
@@ -19,24 +19,31 @@ configfile: "config.yaml"
 
 rule all:
     input:
-        # expand("{group}-{analysis}", group=GROUPS, analysis=ANALYSES)
-        "forward-notrim-deblur-rdp-tax.qza"
-        , "forward-notrim-derep-seqs.qza"
-        , "forward-notrim-derep-table.tsv"
-        , "forward-notrim-closedref-table.tsv",
+        expand("{group}-{analysis}", group=GROUPS, analysis=ANALYSES)
 
 rule clean:
     shell:
         "rm -f"
-        " *.txt *.qza *.biom *.tsv *.fa *.b6 *.log" + \
+        " *.txt *.qza *.biom *.tsv *.fa *.b6 *.log " + \
         " ".join(expand("{group}/*", group=GROUPS))
 
+rule rdp_tax_table:
+    output: "{x}-deblur-rdp-taxtable.tsv"
+    input: table="{x}-deblur-table.tsv", tax="{x}-deblur-rdp-tax.tsv"
+    script: "scripts/write_tax_table.R"
+
+rule ref_tax_table:
+    output: "{x}ref-taxtable.tsv"
+    input: table="{x}ref-table.tsv", tax="db/97_otu_taxonomy.txt"
+    script: "scripts/write_tax_table.R"
+
 rule export_taxonomy:
+    """Taxonomy qza to tsv"""
     output: "{x}-tax.tsv"
     input: "{x}-tax.qza"
     shell:
         qiime + " tools export"
-        " --i-input-path {input}"
+        " --input-path {input}"
         " --output-path ."
         " && mv taxonomy.tsv {output}"
 
@@ -77,7 +84,7 @@ rule deblur:
         table = "{x}-deblur-table.qza",
         seqs = "{x}-deblur-seqs.qza",
         stats = "{x}-deblur-stats.qza"
-    input: "{x}-filter.qza"
+    input: "{x}-filter-seqs.qza"
     shell:
         qiime + " deblur denoise-16S"
         " --i-demultiplexed-seqs {input}"
@@ -129,21 +136,6 @@ rule open_ref:
         " --o-clustered-sequences {output.clusters}"
         " --o-new-reference-sequences {output.seqs}"
 
-rule reference_taxonomy2:
-    output: "97_otus_taxonomy.qza"
-    input: "97_otus_taxonomy.tsv"
-    shell:
-        qiime + " tools import"
-        " --input-path {input}"
-        " --output-path {output}"
-        " --type 'FeatureTable[Taxonomy]'"
-        " --input-format TSVTaxonomyFormat"
-
-rule reference_taxonomy1:
-    output: "97_otus_taxonomy.tsv"
-    input: "db/97_otu_taxonomy.txt"
-    script: "scripts/convert-taxonomy.py"
-
 rule reference_otus:
     output: "97_otus.qza"
     input: "db/97_otus.fasta"
@@ -153,13 +145,8 @@ rule reference_otus:
         " --output-path {output}"
         " --type 'FeatureData[Sequence]'"
 
-rule export_tsv:
-    output: "{x}-table.tsv"
-    input: "{x}-table.biom"
-    shell: "biom convert -i {input} -o {output} --to-tsv"
-
 rule export_fasta:
-    output: "{x}-seqs.fa"
+    output: "{x}-seqs.fasta"
     input: "{x}-seqs.qza"
     shell:
         qiime + " tools export"
@@ -168,19 +155,20 @@ rule export_fasta:
         " && mv dna-sequences.fasta {output}"
 
 rule export_table:
-    output: "{x}-table.biom"
+    output: "{x}-table.tsv"
     input: "{x}-table.qza"
     shell:
         qiime + " tools export"
         " --input-path {input}"
         " --output-path ./"
-        " && mv feature-table.biom {output}"
+        " && biom convert -i feature-table.biom -o {output} --to-tsv"
+        " && rm feature-table.biom"
 
 rule dereplicate:
     output:
         table = "{x}-derep-table.qza",
         seqs = "{x}-derep-seqs.qza"
-    input: "{x}-filter.qza"
+    input: "{x}-filter-seqs.qza"
     shell:
         qiime + " vsearch dereplicate-sequences"
         " --i-sequences {input}"
@@ -188,8 +176,8 @@ rule dereplicate:
         " --o-dereplicated-sequences {output.seqs}"
 
 rule filter:
-    output: seqs="{x}-filter.qza", stats="{x}-filter-stats.qza"
-    input: "{x}-demux.qza"
+    output: seqs="{x}-filter-seqs.qza", stats="{x}-filter-stats.qza"
+    input: "{x}-demux-seqs.qza"
     shell:
         qiime + " quality-filter q-score"
         " --i-demux {input}"
@@ -197,7 +185,7 @@ rule filter:
         " --o-filter-stats {output.stats}"
 
 rule demux:
-    output: "{x}-demux.qza"
+    output: "{x}-demux-seqs.qza"
     input: "{x}-manifest.txt"
     shell:
         qiime + " tools import"
@@ -206,10 +194,10 @@ rule demux:
         " --output-path {output}"
         " --input-format SingleEndFastqManifestPhred33"
 
-rule write_manifest:
-    output: expand("{group}-manifest.txt", group=GROUPS)
-    input: MANIFEST_FILES
-    params: libraries=LIBRARIES
+rule manifest:
+    output: "{x}-manifest.txt"
+    input: expand("{{x}}/{library}_R1.fastq", library=LIBRARIES)
+    params: libraries=config["libraries"]
     script: "scripts/write_manifest.py"
 
 rule merge:

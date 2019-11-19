@@ -1,36 +1,20 @@
 import csv, re, os.path
 
-def classify_file(fn):
-    directory, basename = os.path.split(fn)
+group = re.match("(.*)-manifest.txt", snakemake.output[0]).group(1)
 
-    m = re.match("^(.*)_R1.fastq", basename)
+with open(snakemake.output[0], "w") as f:
+    writer = csv.DictWriter(f, fieldnames=["sample-id", "absolute-filepath", "direction"])
+    writer.writeheader()
 
-    if m is None:
-        raise RuntimeError(f"bad filename {basename}")
+    for filepath in snakemake.input:
+        match = re.match("(.*)/(.*)_R1.fastq", filepath)
+        assert group == match.group(1)
 
-    library = m.group(1)
+        library = match.group(2)
+        sample_name = snakemake.params["libraries"][library]
+        sample_id = f"{group}-{sample_name}"
 
-    manifest = f"{directory}-manifest.txt"
-    sample_id = f"{directory}-{library}"
+        abs_filepath = "/data/" + filepath
+        row = {"sample-id": sample_id, "absolute-filepath": abs_filepath, "direction": "forward"}
 
-    absolute_filepath = "/data/" + fn
-
-    return {"manifest": manifest, "library": library, "row": {"sample-id": sample_id, "absolute-filepath": absolute_filepath, "direction": "forward"}}
-
-data = [classify_file(x) for x in snakemake.input]
-
-known_manifests = set([x["manifest"] for x in data])
-assert known_manifests == set(snakemake.output)
-
-known_libraries = set([x["library"] for x in data])
-assert known_libraries == set(snakemake.params["libraries"])
-
-for output_fn in snakemake.output:
-    rows = [x["row"] for x in data if x["manifest"] == output_fn]
-
-    with open(output_fn, "w") as f:
-        w = csv.DictWriter(f, fieldnames=["sample-id", "absolute-filepath", "direction"])
-        w.writeheader()
-
-        for row in rows:
-            w.writerow(row)
+        writer.writerow(row)

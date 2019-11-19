@@ -27,7 +27,7 @@ rule all:
 rule clean:
     shell:
         "rm -f"
-        " *.txt *.qza *.biom *.tsv *.fa *.b6 *.log *.udb" + \
+        " *.txt *.qza *.biom *.tsv *.fa *.b6 *.log *.udb *.tar.gz" + \
         " " + " ".join(expand("{group}/*", group=GROUPS))
 
 rule export_fasta:

@@ -1,7 +1,6 @@
-forward-primer: GTGCCAGCMGCCGCGGTAA
-reverse-primer: GGACTACHVGGGTWTCTAAT
-forward-primer-raw: CTTTCCCTACACGACGCTCTTCCGATCTGTGCCAGCMGCCGCGGTAA
-reverse-primer-raw: GGAGTTCAGACGTGTGCTCTTCCGATCTGGACTACHVGGGTWTCTAAT
+primers:
+  forward: GTGCCAGCMGCCGCGGTAA
+  reverse: GGACTACHVGGGTWTCTAAT
 classifier-url: https://data.qiime2.org/2019.10/common/gg-13-8-99-nb-classifier.qza
 classifier-md5: abb3da907ef432bcaf70b65027983b23
 taxonomy-url: ftp://greengenes.microbio.me/greengenes_release/gg_13_5/gg_13_8_otus.tar.gz

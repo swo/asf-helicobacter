@@ -28,8 +28,8 @@ rule clean:
         " " + " ".join(expand("{group}/*", group=GROUPS))
 
 rule rdp_tax_table:
-    output: "{x}-deblur-rdp-taxtable.tsv"
-    input: table="{x}-deblur-table.tsv", tax="{x}-deblur-rdp-tax.tsv"
+    output: "{x}-rdp-taxtable.tsv"
+    input: table="{x}-table.tsv", tax="{x}-rdp-tax.tsv"
     script: "scripts/tax-table.R"
 
 rule ref_tax_table:
@@ -79,31 +79,14 @@ rule download_classifier:
 #     params: db="db/97_otus.udb"
 #     shell: "usearch -usearch_global {input} -db {params.db} -id 0.97 -strand both -blast6out {output} -maxaccepts 0 -maxrejects 0"
 
-rule deblur:
-    output:
-        table = "{x}-deblur-table.qza",
-        seqs = "{x}-deblur-seqs.qza",
-        stats = "{x}-deblur-stats.qza"
-    input: "{x}-filter-seqs.qza"
-    params: trim_length=lambda wc: config["deblur-trim-length"][wc.x]
-    shell:
-        qiime + " deblur denoise-16S"
-        " --i-demultiplexed-seqs {input}"
-        " --p-trim-length {params.trim_length}"
-        " --p-min-reads 1"
-        " --p-sample-stats"
-        " --o-table {output.table}"
-        " --o-representative-sequences {output.seqs}"
-        " --o-stats {output.stats}"
-
 rule closed_ref:
     output:
         table = "{x}-closedref-table.qza",
         clusters = "{x}-closedref-clustered-seqs.qza",
         unmatched = "{x}-closedref-unmatched-seqs.qza"
     input:
-        seqs = "{x}-derep-seqs.qza",
-        table = "{x}-derep-table.qza",
+        seqs = "{x}-deblur-seqs.qza",
+        table = "{x}-deblur-table.qza",
         ref = "97_otus.qza"
     shell:
         qiime + " vsearch cluster-features-closed-reference"
@@ -121,8 +104,8 @@ rule open_ref:
         clusters = "{x}-openref-clustered-seqs.qza",
         seqs = "{x}-openref-newref-seqs.qza"
     input:
-        seqs = "{x}-derep-seqs.qza",
-        table = "{x}-derep-table.qza",
+        seqs = "{x}-deblur-seqs.qza",
+        table = "{x}-deblur-table.qza",
         ref = "97_otus.qza"
     shell:
         qiime + " vsearch cluster-features-open-reference"
@@ -177,16 +160,33 @@ rule export_table:
         " && biom convert -i feature-table.biom -o {output} --to-tsv"
         " && rm feature-table.biom"
 
-rule dereplicate:
+rule deblur:
     output:
-        table = "{x}-derep-table.qza",
-        seqs = "{x}-derep-seqs.qza"
+        table = "{x}-deblur-table.qza",
+        seqs = "{x}-deblur-seqs.qza",
+        stats = "{x}-deblur-stats.qza"
     input: "{x}-filter-seqs.qza"
+    params: trim_length=lambda wc: config["deblur-trim-length"][wc.x]
     shell:
-        qiime + " vsearch dereplicate-sequences"
-        " --i-sequences {input}"
-        " --o-dereplicated-table {output.table}"
-        " --o-dereplicated-sequences {output.seqs}"
+        qiime + " deblur denoise-16S"
+        " --i-demultiplexed-seqs {input}"
+        " --p-trim-length {params.trim_length}"
+        " --p-min-reads 1"
+        " --p-sample-stats"
+        " --o-table {output.table}"
+        " --o-representative-sequences {output.seqs}"
+        " --o-stats {output.stats}"
+
+# rule dereplicate:
+#     output:
+#         table = "{x}-derep-table.qza",
+#         seqs = "{x}-derep-seqs.qza"
+#     input: "{x}-filter-seqs.qza"
+#     shell:
+#         qiime + " vsearch dereplicate-sequences"
+#         " --i-sequences {input}"
+#         " --o-dereplicated-table {output.table}"
+#         " --o-dereplicated-sequences {output.seqs}"
 
 rule filter:
     output: seqs="{x}-filter-seqs.qza", stats="{x}-filter-stats.qza"
@@ -216,7 +216,7 @@ rule manifest:
 rule trim_merge:
     output: "merge-trim/{x}.fastq"
     input: "merge-notrim/{x}.fastq"
-    params: forward=config["forward-primer"], reverse=config["reverse-primer"]
+    params: forward=config["primers"]["forward"], reverse=config["primers"]["reverse"]
     shell: "cutadapt --front {params.forward} --adapter {params.reverse} --trimmed-only -o {output} {input}"
 
 rule merge:
@@ -227,13 +227,13 @@ rule merge:
 rule trim_forward:
     output: "forward-trim/{x}.fastq"
     input: "forward-notrim/{x}.fastq"
-    params: primer=config["forward-primer"]
+    params: primer=config["primers"]["forward"]
     shell: "cutadapt --front {params.primer} --trimmed-only -o {output} {input}"
 
 rule trim_reverse:
     output: "reverse-trim/{x}.fastq"
     input: "reverse-notrim/{x}.fastq"
-    params: primer=config["reverse-primer"]
+    params: primer=config["primers"]["reverse"]
     shell: "cutadapt --front {params.primer} --trimmed-only -o {output} {input}"
 
 rule copy_reverse:

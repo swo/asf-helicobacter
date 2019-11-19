@@ -1,25 +1,27 @@
 import glob, os.path
 
+configfile: "config.yaml"
+
 DIRECTIONS = ["forward", "reverse", "merge"]
 TRIMS = ["notrim", "trim"]
 GROUPS = expand("{direction}-{trim}", direction=DIRECTIONS, trim=TRIMS)
 
 # library names from raw, input files
-LIBRARIES = set([re.search("raw/(.*)_R1.fastq", x).group(1) for x in glob.glob("raw/*_R1.fastq")])
+# LIBRARIES = set([re.search("raw/(.*)_R1.fastq", x).group(1) for x in glob.glob("raw/*_R1.fastq")])
+LIBRARIES = config["libraries"].keys()
 
 # groups of files expected as outputs
 MANIFEST_FILES = expand("{group}/{library}_R1.fastq", group=GROUPS, library=LIBRARIES)
 
-ANALYSES = ["closedref-taxtable.tsv", "openref-taxtable.tsv", "deblur-table.tsv", "deblur-rdp-tax.tsv"]
+ANALYSES = ["closedref-taxtable.tsv", "openref-taxtable.tsv", "deblur-rdp-taxtable.tsv"]
 
 # note that current directory is mounted as /data in the container
 qiime = "docker run -t -i -v $(pwd):/data qiime2/core:2019.10 qiime"
 
-configfile: "config.yaml"
-
 rule all:
     input:
-        expand("{group}-{analysis}", group=GROUPS, analysis=ANALYSES)
+        # expand("{group}-{analysis}", group=GROUPS, analysis=ANALYSES)
+        expand("forward-trim-{analysis}", analysis=ANALYSES)
 
 rule clean:
     shell:
@@ -30,12 +32,12 @@ rule clean:
 rule rdp_tax_table:
     output: "{x}-deblur-rdp-taxtable.tsv"
     input: table="{x}-deblur-table.tsv", tax="{x}-deblur-rdp-tax.tsv"
-    script: "scripts/write_tax_table.R"
+    script: "scripts/tax-table.R"
 
 rule ref_tax_table:
     output: "{x}ref-taxtable.tsv"
     input: table="{x}ref-table.tsv", tax="db/97_otu_taxonomy.txt"
-    script: "scripts/write_tax_table.R"
+    script: "scripts/tax-table.R"
 
 rule export_taxonomy:
     """Taxonomy qza to tsv"""
@@ -85,12 +87,12 @@ rule deblur:
         seqs = "{x}-deblur-seqs.qza",
         stats = "{x}-deblur-stats.qza"
     input: "{x}-filter-seqs.qza"
+    params: trim_length=lambda wc: config["deblur-trim-length"][wc.x]
     shell:
         qiime + " deblur denoise-16S"
         " --i-demultiplexed-seqs {input}"
-        " --p-trim-length 100"
+        " --p-trim-length {params.trim_length}"
         " --p-min-reads 1"
-        " --p-jobs-to-start 2"
         " --p-sample-stats"
         " --o-table {output.table}"
         " --o-representative-sequences {output.seqs}"
@@ -111,7 +113,6 @@ rule closed_ref:
         " --i-table {input.table}"
         " --i-reference-sequences {input.ref}"
         " --p-perc-identity 0.97"
-        " --p-threads 2"
         " --o-clustered-table {output.table}"
         " --o-clustered-sequences {output.clusters}"
         " --o-unmatched-sequences {output.unmatched}"
@@ -131,7 +132,6 @@ rule open_ref:
         " --i-table {input.table}"
         " --i-reference-sequences {input.ref}"
         " --p-perc-identity 0.97"
-        " --p-threads 2"
         " --o-clustered-table {output.table}"
         " --o-clustered-sequences {output.clusters}"
         " --o-new-reference-sequences {output.seqs}"

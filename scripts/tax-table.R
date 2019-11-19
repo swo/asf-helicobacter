@@ -40,15 +40,8 @@ read_table <- function(fn) {
 tax <- read_tax(snakemake@input[['tax']])
 table <- read_table(snakemake@input[['table']])
 
-counts <- table %>%
+table %>%
   gather('sample', 'counts', -otu) %>%
   left_join(tax, by = 'otu') %>%
-  replace_na(list(Taxon = 'no_taxonomy')) %>%
-  group_by(Taxon) %>%
-  summarize_at('counts', sum) %>%
-  mutate(relative_abundance = counts / sum(counts)) %>%
-  mutate(display_taxon = if_else(relative_abundance <= 0.015, 'Other', Taxon)) %>%
-  group_by(display_taxon) %>%
-  summarize_at('counts', sum)
-
-write_tsv(counts, snakemake@output[[1]])
+  replace_na(list(Taxon = 'no_taxonomy_found')) %>%
+  write_tsv(snakemake@output[[1]])

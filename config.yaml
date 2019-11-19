@@ -18,3 +18,10 @@ libraries:
   LIB018767_GEN00047620_S93_L001: 'heli5'
   LIB018767_GEN00047621_S94_L001: 'heli6'
   LIB018767_GEN00047622_S95_L001: 'heli7'
+deblur-trim-length:
+  forward-notrim: 150
+  forward-trim: 131
+  reverse-notrim: 150
+  reverse-trim: 130
+  merge-notrim: 292
+  merge-trim: 253

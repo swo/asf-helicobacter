@@ -9,6 +9,4 @@ Because they need to be deblurred all separately
 
 # To do
 
-- move rdp to `qiime feature-classifier classify-sklearn`
-- move closed ref to `qiime vsearch cluster-features-closed-reference`
-- move open ref to `qiime vsearch cluster-features-open-reference`
+- Fix `taxtable` to group by sample *and* OTU

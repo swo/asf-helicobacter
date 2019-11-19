@@ -7,14 +7,14 @@ Because they need to be deblurred all separately
 - `cutadapt`
 - `fastq-join`
 
+I use `cutadapt` rather than Qiime 2's because I found that the option to
+keep only trimmed sequences does not work in Qiime 2 version 2019.10.
+
+I use `fastq-join` rather than Qiime 2's merging plugin, because that plugin
+uses vsearch, which applies too strict a merging criteria to get most of the
+reads merged, and those criteria cannot be relaxed using parameter options.
+
 # To do
-
-## Errors
-
-- Trimming and excluding files means that merging doesn't work?
-- Instead, merge-notrim, and then trim all the files inside of Q2 using cutadapt
-    - `--p-discard-untrimmed`
-- Did I try to do this before and, for some reason, it didn't work?
 
 ## Later
 

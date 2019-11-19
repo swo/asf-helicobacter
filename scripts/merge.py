@@ -1,8 +1,14 @@
 import csv, re, os.path, subprocess, os, tempfile
 
-def merge(forward_fn, reverse_fn, merge_fn, min_overlap=4, percent_max_diff=25):
+def merge(forward_fn, reverse_fn, merge_fn, min_overlap=None, percent_max_diff=None):
     with tempfile.TemporaryDirectory() as tmp_dir:
-        command = ["fastq-join", forward_fn, reverse_fn, "-o", tmp_dir + "/", "-m", str(min_overlap), "-p", str(percent_max_diff)]
+        command = ["fastq-join", forward_fn, reverse_fn, "-o", tmp_dir + "/"]
+
+        if min_overlap is not None:
+            command += ["-m", str(min_overlap)]
+
+        if percent_max_diff is not None:
+            command += ["-p", str(percent_max_diff)]
 
         print(" ".join(command))
         result = subprocess.run(command, capture_output=True)
@@ -14,4 +20,4 @@ def merge(forward_fn, reverse_fn, merge_fn, min_overlap=4, percent_max_diff=25):
 
     assert os.path.isfile(merge_fn)
 
-merge(snakemake.input["forward"], snakemake.input["reverse"], snakemake.output[0])
+merge(snakemake.input["forward"], snakemake.input["reverse"], snakemake.output[0], min_overlap=snakemake.params["min-overlap"], percent_max_diff=snakemake.params["percent-max-diff"])

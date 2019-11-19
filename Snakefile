@@ -12,7 +12,10 @@ LIBRARIES = config["libraries"].keys()
 # groups of files expected as outputs
 MANIFEST_FILES = expand("{group}/{library}_R1.fastq", group=GROUPS, library=LIBRARIES)
 
-ANALYSES = ["closedref-taxtable.tsv", "openref-taxtable.tsv", "deblur-rdp-taxtable.tsv"]
+ANALYSES = [
+    "closedref-taxtable.tsv", "openref-taxtable.tsv", "rdp-taxtable.tsv",
+    # "openref-newref-seqs.fasta"
+]
 
 # note that current directory is mounted as /data in the container
 qiime = "docker run -t -i -v $(pwd):/data qiime2/core:2019.10 qiime"
@@ -27,9 +30,28 @@ rule clean:
         " *.txt *.qza *.biom *.tsv *.fa *.b6 *.log *.udb" + \
         " " + " ".join(expand("{group}/*", group=GROUPS))
 
+rule export_fasta:
+    output: "{x}-seqs.fasta"
+    input: "{x}-seqs.qza"
+    shell:
+        qiime + " tools export"
+        " --input-path {input}"
+        " --output-path ."
+        " && mv dna-sequences.fasta {output}"
+
+rule export_table:
+    output: "{x}-table.tsv"
+    input: "{x}-table.qza"
+    shell:
+        qiime + " tools export"
+        " --input-path {input}"
+        " --output-path ./"
+        " && biom convert -i feature-table.biom -o {output} --to-tsv"
+        " && rm feature-table.biom"
+
 rule rdp_tax_table:
     output: "{x}-rdp-taxtable.tsv"
-    input: table="{x}-table.tsv", tax="{x}-rdp-tax.tsv"
+    input: table="{x}-deblur-table.tsv", tax="{x}-rdp-tax.tsv"
     script: "scripts/tax-table.R"
 
 rule ref_tax_table:
@@ -49,7 +71,7 @@ rule export_taxonomy:
 
 rule rdp:
     output: "{x}-rdp-tax.qza"
-    input: reads="{x}-seqs.qza", classifier="rdp-classifier.qza"
+    input: reads="{x}-deblur-seqs.qza", classifier="rdp-classifier.qza"
     shell:
         qiime + " feature-classifier classify-sklearn"
         " --i-classifier {input.classifier}"
@@ -58,7 +80,7 @@ rule rdp:
 
 rule download_classifier:
     output: "rdp-classifier.qza"
-    params: url=config["classifier-url"], md5=config["classifier-md5"]
+    params: url=config["classifier"]["url"], md5=config["classifier"]["md5"]
     script: "scripts/download-and-check-md5.py"
 
 # rule taxonomy:
@@ -138,27 +160,8 @@ rule extract_reference_otus:
 
 rule download_reference:
     output: "gg_13_8_otus.tar.gz"
-    params: url=config["taxonomy-url"], md5=config["taxonomy-md5"]
+    params: url=config["taxonomy"]["url"], md5=config["taxonomy"]["md5"]
     script: "download-and-check-md5.py"
-
-rule export_fasta:
-    output: "{x}-seqs.fasta"
-    input: "{x}-seqs.qza"
-    shell:
-        qiime + " tools export"
-        " --input-path {input}"
-        " --output-path ."
-        " && mv dna-sequences.fasta {output}"
-
-rule export_table:
-    output: "{x}-table.tsv"
-    input: "{x}-table.qza"
-    shell:
-        qiime + " tools export"
-        " --input-path {input}"
-        " --output-path ./"
-        " && biom convert -i feature-table.biom -o {output} --to-tsv"
-        " && rm feature-table.biom"
 
 rule deblur:
     output:
@@ -222,6 +225,9 @@ rule trim_merge:
 rule merge:
     output: "merge-notrim/{x}.fastq"
     input: forward="forward-notrim/{x}.fastq", reverse="reverse-notrim/{x}.fastq"
+    params:
+        min_overlap=config["merge"]["min-overlap"],
+        percent_max_diff=config["merge"]["percent-max-diff"]
     script: "scripts/merge.py"
 
 rule trim_forward:

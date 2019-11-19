@@ -23,7 +23,7 @@ known_manifests = set([x["manifest"] for x in data])
 assert known_manifests == set(snakemake.output)
 
 known_libraries = set([x["library"] for x in data])
-assert known_libraries == set(snakemake.params["libs"])
+assert known_libraries == set(snakemake.params["libraries"])
 
 for output_fn in snakemake.output:
     rows = [x["row"] for x in data if x["manifest"] == output_fn]

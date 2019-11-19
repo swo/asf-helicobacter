@@ -2,3 +2,5 @@ forward-primer: GTGCCAGCMGCCGCGGTAA
 reverse-primer: GGACTACHVGGGTWTCTAAT
 forward-primer-raw: CTTTCCCTACACGACGCTCTTCCGATCTGTGCCAGCMGCCGCGGTAA
 reverse-primer-raw: GGAGTTCAGACGTGTGCTCTTCCGATCTGGACTACHVGGGTWTCTAAT
+classifier-url: https://data.qiime2.org/2019.10/common/gg-13-8-99-nb-classifier.qza
+classifier-md5: abb3da907ef432bcaf70b65027983b23

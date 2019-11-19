@@ -13,19 +13,17 @@ MANIFEST_FILES = expand("{group}/{library}_R1.fastq", group=GROUPS, library=LIBR
 ANALYSES = ["deblur-table.tsv", "deblur-rdp.tsv", "derep-usearch-default-taxonomy.tsv", "derep-usearch-exhaustive-taxonomy.tsv"]
 
 # note that current directory is mounted as /data in the container
-qiime = "docker run -t -i -v $(pwd):/data qiime2/core:2018.11 qiime"
+qiime = "docker run -t -i -v $(pwd):/data qiime2/core:2019.10 qiime"
 
 configfile: "config.yaml"
 
 rule all:
     input:
-        expand("{group}-{analysis}", group=GROUPS, analysis=ANALYSES)
-        # "merge-trim/sample1_R1.fastq"
-        # "merge-trim-deblur-table.tsv"
-        # expand("{direction}-{trim}-derep-table.tsv", direction=DIRECTIONS, trim=TRIMS),
-        #expand("{direction}-derep-usearch-{search}.b6", direction=DIRECTIONS, search=SEARCHES)
-        # expand("{direction}-derep-usearch-default-taxonomy.tsv", direction=DIRECTIONS),
-        # expand("{direction}-derep-rdp.tsv", direction=DIRECTIONS)
+        # expand("{group}-{analysis}", group=GROUPS, analysis=ANALYSES)
+        "forward-notrim-deblur-rdp-tax.qza"
+        , "forward-notrim-derep-seqs.qza"
+        , "forward-notrim-derep-table.tsv"
+        , "forward-notrim-closedref-table.tsv",
 
 rule clean:
     shell:
@@ -33,29 +31,46 @@ rule clean:
         " *.txt *.qza *.biom *.tsv *.fa *.b6 *.log" + \
         " ".join(expand("{group}/*", group=GROUPS))
 
+rule export_taxonomy:
+    output: "{x}-tax.tsv"
+    input: "{x}-tax.qza"
+    shell:
+        qiime + " tools export"
+        " --i-input-path {input}"
+        " --output-path ."
+        " && mv taxonomy.tsv {output}"
+
 rule rdp:
-    output: "{x}-rdp.tsv"
-    input: "{x}-seqs.fa"
-    shell: "scripts/rdp_classify.py {input} {output}"
+    output: "{x}-rdp-tax.qza"
+    input: reads="{x}-seqs.qza", classifier="rdp-classifier.qza"
+    shell:
+        qiime + " feature-classifier classify-sklearn"
+        " --i-classifier {input.classifier}"
+        " --i-reads {input.reads}"
+        " --o-classification {output}"
 
-rule taxonomy:
-    output: "{x}-taxonomy.tsv"
-    input: "{x}.b6"
-    params: taxonomy="db/97_otus_taxonomy.txt"
-    script: "scripts/b6-to-tax.R"
+rule download_classifier:
+    output: "rdp-classifier.qza"
+    params: url=config["classifier-url"], md5=config["classifier-md5"]
+    script: "scripts/download-and-check-md5.py"
 
-rule usearch_default:
-    output: "{x}-usearch-default.b6"
-    input: "{x}-seqs.fa"
-    params: db="db/97_otus.udb"
-    shell: "usearch -usearch_global {input} -db {params.db} -id 0.97 -strand both -blast6out {output} -maxaccepts 1 -maxrejects 8"
+# rule taxonomy:
+#     output: "{x}-taxonomy.tsv"
+#     input: "{x}.b6"
+#     params: taxonomy="db/97_otu_taxonomy.txt"
+#     script: "scripts/b6-to-tax.R"
 
-rule usearch_exhaustive:
-    output: "{x}-usearch-exhaustive.b6"
-    input: "{x}-seqs.fa"
-    params: db="db/97_otus.udb"
-    shell: "usearch -usearch_global {input} -db {params.db} -id 0.97 -strand both -blast6out {output} -maxaccepts 0 -maxrejects 0"
+# rule usearch_default:
+#     output: "{x}-usearch-default.b6"
+#     input: "{x}-seqs.fa"
+#     params: db="db/97_otus.udb"
+#     shell: "usearch -usearch_global {input} -db {params.db} -id 0.97 -strand both -blast6out {output} -maxaccepts 1 -maxrejects 8"
 
+# rule usearch_exhaustive:
+#     output: "{x}-usearch-exhaustive.b6"
+#     input: "{x}-seqs.fa"
+#     params: db="db/97_otus.udb"
+#     shell: "usearch -usearch_global {input} -db {params.db} -id 0.97 -strand both -blast6out {output} -maxaccepts 0 -maxrejects 0"
 
 rule deblur:
     output:
@@ -66,7 +81,7 @@ rule deblur:
     shell:
         qiime + " deblur denoise-16S"
         " --i-demultiplexed-seqs {input}"
-        " --p-trim-length 253"
+        " --p-trim-length 100"
         " --p-min-reads 1"
         " --p-jobs-to-start 2"
         " --p-sample-stats"
@@ -82,7 +97,7 @@ rule closed_ref:
     input:
         seqs = "{x}-derep-seqs.qza",
         table = "{x}-derep-table.qza",
-        ref = "reference.qza"
+        ref = "97_otus.qza"
     shell:
         qiime + " vsearch cluster-features-closed-reference"
         " --i-sequences {input.seqs}"
@@ -102,7 +117,7 @@ rule open_ref:
     input:
         seqs = "{x}-derep-seqs.qza",
         table = "{x}-derep-table.qza",
-        ref = "reference.qza"
+        ref = "97_otus.qza"
     shell:
         qiime + " vsearch cluster-features-open-reference"
         " --i-sequences {input.seqs}"
@@ -114,15 +129,24 @@ rule open_ref:
         " --o-clustered-sequences {output.clusters}"
         " --o-new-reference-sequences {output.seqs}"
 
-rule reference_udb:
-    output: "db/97_otus.udb"
-    input: "db/97_otus.fasta"
+rule reference_taxonomy2:
+    output: "97_otus_taxonomy.qza"
+    input: "97_otus_taxonomy.tsv"
     shell:
-        "usearch -makeudb_usearch {input} -output {output}"
+        qiime + " tools import"
+        " --input-path {input}"
+        " --output-path {output}"
+        " --type 'FeatureTable[Taxonomy]'"
+        " --input-format TSVTaxonomyFormat"
 
-rule reference:
-    output: "reference.qza"
-    input: "db/97_otus.udb"
+rule reference_taxonomy1:
+    output: "97_otus_taxonomy.tsv"
+    input: "db/97_otu_taxonomy.txt"
+    script: "scripts/convert-taxonomy.py"
+
+rule reference_otus:
+    output: "97_otus.qza"
+    input: "db/97_otus.fasta"
     shell:
         qiime + " tools import"
         " --input-path {input}"
@@ -172,7 +196,7 @@ rule filter:
         " --o-filtered-sequences {output.seqs}"
         " --o-filter-stats {output.stats}"
 
-rule import:
+rule demux:
     output: "{x}-demux.qza"
     input: "{x}-manifest.txt"
     shell:
@@ -205,12 +229,12 @@ rule trim_reverse:
     params: primer=config["reverse-primer"]
     script: "scripts/trim.py"
 
-rule symlink_reverse:
+rule copy_reverse:
     output: "reverse-notrim/{x}_R1.fastq"
     input: "raw/{x}_R2.fastq"
-    shell: "ln -s $PWD/{input} {output}"
+    shell: "cp {input} {output}"
 
-rule symlink_forward:
+rule copy_forward:
     output: "forward-notrim/{x}_R1.fastq"
     input: "raw/{x}_R1.fastq"
-    shell: "ln -s $PWD/{input} {output}"
+    shell: "cp {input} {output}"

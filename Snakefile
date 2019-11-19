@@ -80,8 +80,12 @@ rule rdp:
 
 rule download_classifier:
     output: "rdp-classifier.qza"
-    params: url=config["classifier"]["url"], md5=config["classifier"]["md5"]
-    script: "scripts/download-and-check-md5.py"
+    params:
+        url=config["classifier"]["url"],
+        md5=config["classifier"]["md5"]
+    shell:
+        "wget {params.url} -o {output}"
+        " && echo '{params.md5}  {params.md5}' | md5sum "
 
 # rule taxonomy:
 #     output: "{x}-taxonomy.tsv"
@@ -160,8 +164,12 @@ rule extract_reference_otus:
 
 rule download_reference:
     output: "gg_13_8_otus.tar.gz"
-    params: url=config["taxonomy"]["url"], md5=config["taxonomy"]["md5"]
-    script: "download-and-check-md5.py"
+    params:
+        url=config["taxonomy"]["url"],
+        md5=config["taxonomy"]["md5"]
+    shell:
+        "wget {params.url} -o {output}"
+        " && echo '{params.md5}  {params.md5}' | md5sum "
 
 rule deblur:
     output:

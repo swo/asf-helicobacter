@@ -4,8 +4,8 @@ def trim(input_fn, output_fn, primer):
     command = ["cutadapt", "--front", primer, "-o", output_fn, input_fn]
     print(" ".join(command))
     results = subprocess.run(command, capture_output=True)
-    print(results.stdout)
-    print(results.stderr)
+    print(results.stdout.decode("utf-8"))
+    print(results.stderr.decode("utf-8"))
 
     assert os.path.isfile(output_fn)
 

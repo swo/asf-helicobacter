@@ -1,10 +1,13 @@
 raw/
+doc/
+
+.snakemake/
+.*.swp
+
 *.biom
 *.qza
 *.txt
 *.tsv
-.snakemake/
-.*.swp
 *.fastq
 *.fa
 *.b6

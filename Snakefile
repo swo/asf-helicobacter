@@ -20,8 +20,7 @@ qiime = "docker run -t -i -v $(pwd):/data qiime2/core:2019.10 qiime"
 
 rule all:
     input:
-        # expand("{group}-{analysis}", group=GROUPS, analysis=ANALYSES)
-        expand("forward-trim-{analysis}", analysis=ANALYSES)
+        expand("{group}-{analysis}", group=GROUPS, analysis=ANALYSES)
 
 rule clean:
     shell:

@@ -6,8 +6,8 @@ def merge(forward_fn, reverse_fn, merge_fn, min_overlap=4, percent_max_diff=25):
 
         print(" ".join(command))
         result = subprocess.run(command, capture_output=True)
-        print(result.stdout.decode("utf-8")
-        print(result.stderr.decode("utf-8")
+        print(result.stdout.decode("utf-8"))
+        print(result.stderr.decode("utf-8"))
 
         from_path = tmp_dir + "/join"
         os.replace(from_path, merge_fn)

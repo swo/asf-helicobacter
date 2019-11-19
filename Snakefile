@@ -7,7 +7,6 @@ TRIMS = ["notrim", "trim"]
 GROUPS = expand("{direction}-{trim}", direction=DIRECTIONS, trim=TRIMS)
 
 # library names from raw, input files
-# LIBRARIES = set([re.search("raw/(.*)_R1.fastq", x).group(1) for x in glob.glob("raw/*_R1.fastq")])
 LIBRARIES = config["libraries"].keys()
 
 # groups of files expected as outputs
@@ -25,8 +24,8 @@ rule all:
 rule clean:
     shell:
         "rm -f"
-        " *.txt *.qza *.biom *.tsv *.fa *.b6 *.log " + \
-        " ".join(expand("{group}/*", group=GROUPS))
+        " *.txt *.qza *.biom *.tsv *.fa *.b6 *.log *.udb" + \
+        " " + " ".join(expand("{group}/*", group=GROUPS))
 
 rule rdp_tax_table:
     output: "{x}-deblur-rdp-taxtable.tsv"
@@ -35,7 +34,7 @@ rule rdp_tax_table:
 
 rule ref_tax_table:
     output: "{x}ref-taxtable.tsv"
-    input: table="{x}ref-table.tsv", tax="db/97_otu_taxonomy.txt"
+    input: table="{x}ref-table.tsv", tax="gg_13_8_otus/taxonomy/97_otu_taxonomy.txt"
     script: "scripts/tax-table.R"
 
 rule export_taxonomy:
@@ -137,12 +136,27 @@ rule open_ref:
 
 rule reference_otus:
     output: "97_otus.qza"
-    input: "db/97_otus.fasta"
+    input: "gg_13_8_otus/rep_set/97_otus.fasta"
     shell:
         qiime + " tools import"
         " --input-path {input}"
         " --output-path {output}"
         " --type 'FeatureData[Sequence]'"
+
+rule extract_reference_taxonomy:
+    output: "gg_13_8_otus/taxonomy/97_otu_taxonomy.txt"
+    input: "gg_13_8_otus.tar.gz"
+    shell: "tar -f {input} -x {output}"
+
+rule extract_reference_otus:
+    output: "gg_13_8_otus/rep_set/97_otus.fasta"
+    input: "gg_13_8_otus.tar.gz"
+    shell: "tar -f {input} -x {output}"
+
+rule download_reference:
+    output: "gg_13_8_otus.tar.gz"
+    params: url=config["taxonomy-url"], md5=config["taxonomy-md5"]
+    script: "download-and-check-md5.py"
 
 rule export_fasta:
     output: "{x}-seqs.fasta"

@@ -4,6 +4,8 @@ forward-primer-raw: CTTTCCCTACACGACGCTCTTCCGATCTGTGCCAGCMGCCGCGGTAA
 reverse-primer-raw: GGAGTTCAGACGTGTGCTCTTCCGATCTGGACTACHVGGGTWTCTAAT
 classifier-url: https://data.qiime2.org/2019.10/common/gg-13-8-99-nb-classifier.qza
 classifier-md5: abb3da907ef432bcaf70b65027983b23
+taxonomy-url: ftp://greengenes.microbio.me/greengenes_release/gg_13_5/gg_13_8_otus.tar.gz
+taxonomy-md5: cdda8508a94a9c49ca8114a3d84ef9a2
 libraries:
   LIB018767_GEN00047731_S204_L001: 'noheli1'
   LIB018767_GEN00047732_S205_L001: 'noheli2'

@@ -9,6 +9,15 @@ Because they need to be deblurred all separately
 
 # To do
 
+## Errors
+
+- Trimming and excluding files means that merging doesn't work?
+- Instead, merge-notrim, and then trim all the files inside of Q2 using cutadapt
+    - `--p-discard-untrimmed`
+- Did I try to do this before and, for some reason, it didn't work?
+
+## Later
+
 - Open reference has some sequences that get clustered *de novo*
 - In most cases, there is only one of those that is very big
 - I look in the tax table for the big, unknown-taxonomy OTUs

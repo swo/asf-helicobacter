@@ -213,22 +213,28 @@ rule manifest:
     params: libraries=config["libraries"]
     script: "scripts/write_manifest.py"
 
+rule trim_merge:
+    output: "merge-trim/{x}.fastq"
+    input: "merge-notrim/{x}.fastq"
+    params: forward=config["forward-primer"], reverse=config["reverse-primer"]
+    shell: "cutadapt --front {params.forward} --adapter {params.reverse} --trimmed-only -o {output} {input}"
+
 rule merge:
-    output: "merge-{x}/{y}.fastq"
-    input: forward="forward-{x}/{y}.fastq", reverse="reverse-{x}/{y}.fastq"
+    output: "merge-notrim/{x}.fastq"
+    input: forward="forward-notrim/{x}.fastq", reverse="reverse-notrim/{x}.fastq"
     script: "scripts/merge.py"
 
 rule trim_forward:
     output: "forward-trim/{x}.fastq"
     input: "forward-notrim/{x}.fastq"
     params: primer=config["forward-primer"]
-    script: "scripts/trim.py"
+    shell: "cutadapt --front {params.primer} --trimmed-only -o {output} {input}"
 
 rule trim_reverse:
     output: "reverse-trim/{x}.fastq"
     input: "reverse-notrim/{x}.fastq"
     params: primer=config["reverse-primer"]
-    script: "scripts/trim.py"
+    shell: "cutadapt --front {params.primer} --trimmed-only -o {output} {input}"
 
 rule copy_reverse:
     output: "reverse-notrim/{x}_R1.fastq"

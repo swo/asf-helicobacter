@@ -9,9 +9,6 @@ GROUPS = expand("{direction}-{trim}", direction=DIRECTIONS, trim=TRIMS)
 # library names from raw, input files
 LIBRARIES = config["libraries"].keys()
 
-# groups of files expected as outputs
-MANIFEST_FILES = expand("{group}/{library}_R1.fastq", group=GROUPS, library=LIBRARIES)
-
 ANALYSES = [
     "closedref-taxtable.tsv", "openref-taxtable.tsv", "rdp-taxtable.tsv",
     "openref-usearch.tsv"
@@ -102,24 +99,6 @@ rule download_classifier:
         "wget {params.url} -o {output}"
         " && echo '{params.md5}  {params.md5}' | md5sum "
 
-# rule taxonomy:
-#     output: "{x}-taxonomy.tsv"
-#     input: "{x}.b6"
-#     params: taxonomy="db/97_otu_taxonomy.txt"
-#     script: "scripts/b6-to-tax.R"
-
-# rule usearch_default:
-#     output: "{x}-usearch-default.b6"
-#     input: "{x}-seqs.fa"
-#     params: db="db/97_otus.udb"
-#     shell: "usearch -usearch_global {input} -db {params.db} -id 0.97 -strand both -blast6out {output} -maxaccepts 1 -maxrejects 8"
-
-# rule usearch_exhaustive:
-#     output: "{x}-usearch-exhaustive.b6"
-#     input: "{x}-seqs.fa"
-#     params: db="db/97_otus.udb"
-#     shell: "usearch -usearch_global {input} -db {params.db} -id 0.97 -strand both -blast6out {output} -maxaccepts 0 -maxrejects 0"
-
 rule closed_ref:
     output:
         table = "{x}-closedref-table.qza",
@@ -207,17 +186,6 @@ rule deblur:
         " --o-table {output.table}"
         " --o-representative-sequences {output.seqs}"
         " --o-stats {output.stats}"
-
-# rule dereplicate:
-#     output:
-#         table = "{x}-derep-table.qza",
-#         seqs = "{x}-derep-seqs.qza"
-#     input: "{x}-filter-seqs.qza"
-#     shell:
-#         qiime + " vsearch dereplicate-sequences"
-#         " --i-sequences {input}"
-#         " --o-dereplicated-table {output.table}"
-#         " --o-dereplicated-sequences {output.seqs}"
 
 rule filter:
     output: seqs="{x}-filter-seqs.qza", stats="{x}-filter-stats.qza"

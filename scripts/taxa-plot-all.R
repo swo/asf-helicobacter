@@ -21,14 +21,26 @@ with(data, {
   stopifnot(all(trim == trim2))
 })
 
+discarded <- data %>%
+  group_by(direction, trim, sample, picking, sample) %>%
+  summarize_at('counts', sum) %>%
+  mutate(
+    Taxon = 'Discarded',
+    counts = max(counts) - counts
+  ) %>%
+  ungroup() %>%
+  filter(counts > 0)
+
 plot <- data %>%
+  bind_rows(discarded) %>%
   group_by(direction, trim, picking, sample) %>%
   mutate(ra = counts / sum(counts)) %>%
   ungroup() %>%
   mutate(
     tax = case_when(
+      Taxon == 'Discarded' ~ 'Discarded',
       ra <= 0.015 ~ 'Other',
-      is.na(kingdom) & str_length(otu) == 32 ~ 'New open-ref OTU',
+      picking == 'openref' & is.na(Taxon) & str_length(otu) == 32 ~ 'New open-ref OTU',
       genus != 'g__' ~ genus,
       family != 'f__' ~ family,
       order != 'o__' ~ order,
@@ -40,7 +52,7 @@ plot <- data %>%
   group_by(direction, trim, picking, sample, tax) %>%
   summarize_at('ra', sum) %>%
   ungroup() %>%
-  ggplot(aes(interaction(direction, trim, picking), ra, fill = tax)) +
+  ggplot(aes(interaction(direction, trim, picking), ra, fill = fct_reorder(tax, -ra))) +
   facet_wrap(~ sample) +
   geom_col() +
   coord_flip() +

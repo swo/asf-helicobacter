@@ -20,4 +20,4 @@ def merge(forward_fn, reverse_fn, merge_fn, min_overlap=None, percent_max_diff=N
 
     assert os.path.isfile(merge_fn)
 
-merge(snakemake.input["forward"], snakemake.input["reverse"], snakemake.output[0], min_overlap=snakemake.params["min-overlap"], percent_max_diff=snakemake.params["percent-max-diff"])
+merge(snakemake.input["forward"], snakemake.input["reverse"], snakemake.output[0], min_overlap=snakemake.params["min_overlap"], percent_max_diff=snakemake.params["percent_max_diff"])

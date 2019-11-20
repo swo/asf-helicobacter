@@ -96,7 +96,7 @@ rule download_classifier:
         url=config["classifier"]["url"],
         md5=config["classifier"]["md5"]
     shell:
-        "wget {params.url} -o {output}"
+        "wget {params.url} -O {output}"
         " && echo '{params.md5}  {params.md5}' | md5sum "
 
 rule closed_ref:
@@ -167,7 +167,7 @@ rule download_reference:
         url=config["taxonomy"]["url"],
         md5=config["taxonomy"]["md5"]
     shell:
-        "wget {params.url} -o {output}"
+        "wget {params.url} -O {output}"
         " && echo '{params.md5}  {params.md5}' | md5sum "
 
 rule deblur:

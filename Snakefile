@@ -26,8 +26,9 @@ rule all:
 
 rule clean:
     shell:
-        "rm -f"
+        "rm -rf"
         " *.txt *.qza *.biom *.tsv *.fasta *.b6 *.log *.udb *.tar.gz *.pdf" + \
+        " gg_13_8_otus/"
         " " + " ".join(expand("{group}/*", group=GROUPS))
 
 rule taxa_plot:

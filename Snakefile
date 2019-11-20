@@ -38,8 +38,8 @@ rule usearch_openref:
     input:
         table="{x}-openref-table.tsv",
         seqs="{x}-openref-newref-seqs.fasta",
-        otus="gg_13_8_otus/rep_set/97_otus.udb",
-        taxonomy="gg_13_8_otus/taxonomy/97_otu_taxonomy.txt"
+        otus="97_otus.udb",
+        taxonomy="97_otu_taxonomy.txt"
     script: "scripts/openref-usearch.R"
 
 rule export_fasta:
@@ -68,7 +68,7 @@ rule rdp_tax_table:
 
 rule ref_tax_table:
     output: "{x}ref-taxtable.tsv"
-    input: table="{x}ref-table.tsv", tax="gg_13_8_otus/taxonomy/97_otu_taxonomy.txt"
+    input: table="{x}ref-table.tsv", tax="97_otu_taxonomy.txt"
     script: "scripts/tax-table.R"
 
 rule export_taxonomy:
@@ -139,7 +139,7 @@ rule open_ref:
 
 rule import_reference_otus:
     output: "97_otus.qza"
-    input: "gg_13_8_otus/rep_set/97_otus.fasta"
+    input: "97_otus.fasta"
     shell:
         qiime + " tools import"
         " --input-path {input}"
@@ -147,9 +147,10 @@ rule import_reference_otus:
         " --type 'FeatureData[Sequence]'"
 
 rule extract_reference_taxonomy:
-    output: "gg_13_8_otus/taxonomy/97_otu_taxonomy.txt"
+    output: "97_otu_taxonomy.txt"
     input: "gg_13_8_otus.tar.gz"
-    shell: "tar -f {input} -x {output}"
+    params: archive="gg_13_8_otus/taxonomy/97_otu_taxonomy.txt"
+    shell: "tar -O -f {input} -x {params.archive} > {output}"
 
 rule udb:
     output: "{x}.udb"
@@ -157,9 +158,10 @@ rule udb:
     shell: "usearch -makeudb_usearch {input} -output {output}"
 
 rule extract_reference_otus:
-    output: "gg_13_8_otus/rep_set/97_otus.fasta"
+    output: "97_otus.fasta"
     input: "gg_13_8_otus.tar.gz"
-    shell: "tar -f {input} -x {output}"
+    params: archive="gg_13_8_otus/rep_set/97_otus.fasta"
+    shell: "tar -O -f {input} -x {params.archive} > {output}"
 
 rule download_reference:
     output: "gg_13_8_otus.tar.gz"

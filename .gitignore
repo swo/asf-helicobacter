@@ -9,8 +9,9 @@ doc/
 *.txt
 *.tsv
 *.fastq
-*.fa
+*.fasta
 *.b6
 *.log
 *.udb
 *.tar.gz
+*.pdf

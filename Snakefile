@@ -14,7 +14,7 @@ MANIFEST_FILES = expand("{group}/{library}_R1.fastq", group=GROUPS, library=LIBR
 
 ANALYSES = [
     "closedref-taxtable.tsv", "openref-taxtable.tsv", "rdp-taxtable.tsv",
-    # "openref-newref-seqs.fasta"
+    "openref-usearch.tsv"
 ]
 
 # note that current directory is mounted as /data in the container
@@ -27,8 +27,22 @@ rule all:
 rule clean:
     shell:
         "rm -f"
-        " *.txt *.qza *.biom *.tsv *.fa *.b6 *.log *.udb *.tar.gz" + \
+        " *.txt *.qza *.biom *.tsv *.fasta *.b6 *.log *.udb *.tar.gz *.pdf" + \
         " " + " ".join(expand("{group}/*", group=GROUPS))
+
+rule taxa_plot:
+    output: "{x}-taxaplot.pdf"
+    input: "{x}-taxtable.tsv"
+    script: "scripts/taxa-plot.R"
+
+rule usearch_openref:
+    output: "{x}-openref-usearch.tsv"
+    input:
+        table="{x}-openref-table.tsv",
+        seqs="{x}-openref-newref-seqs.fasta",
+        otus="gg_13_8_otus/rep_set/97_otus.udb",
+        taxonomy="gg_13_8_otus/taxonomy/97_otu_taxonomy.txt"
+    script: "scripts/openref-usearch.R"
 
 rule export_fasta:
     output: "{x}-seqs.fasta"
@@ -143,7 +157,7 @@ rule open_ref:
         " --o-clustered-sequences {output.clusters}"
         " --o-new-reference-sequences {output.seqs}"
 
-rule reference_otus:
+rule import_reference_otus:
     output: "97_otus.qza"
     input: "gg_13_8_otus/rep_set/97_otus.fasta"
     shell:
@@ -156,6 +170,11 @@ rule extract_reference_taxonomy:
     output: "gg_13_8_otus/taxonomy/97_otu_taxonomy.txt"
     input: "gg_13_8_otus.tar.gz"
     shell: "tar -f {input} -x {output}"
+
+rule udb:
+    output: "{x}.udb"
+    input: "{x}.fasta"
+    shell: "usearch -makeudb_usearch {input} -output {output}"
 
 rule extract_reference_otus:
     output: "gg_13_8_otus/rep_set/97_otus.fasta"

@@ -1,4 +1,4 @@
-import glob, os.path
+import uuid
 
 configfile: "config.yaml"
 
@@ -18,7 +18,8 @@ qiime = "docker run -t -i -v $(pwd):/data qiime2/core:2019.10 qiime"
 
 rule all:
     input:
-        expand("{group}-{analysis}", group=GROUPS, analysis=ANALYSES)
+        expand("{group}-{analysis}", group=GROUPS, analysis=ANALYSES) + \
+        ["all-taxaplot.pdf"]
 
 rule clean:
     shell:
@@ -26,6 +27,11 @@ rule clean:
         " *.txt *.qza *.biom *.tsv *.fasta *.b6 *.log *.udb *.tar.gz *.pdf" + \
         " gg_13_8_otus/"
         " " + " ".join(expand("{group}/*", group=GROUPS))
+
+rule taxa_plot_all:
+    output: "all-taxaplot.pdf"
+    input: expand("{direction}-{trim}-{picking}-taxtable.tsv", direction=DIRECTIONS, trim=TRIMS, picking=OTU_PICKINGS)
+    script: "scripts/taxa-plot-all.R"
 
 rule taxa_plot:
     output: "{x}-taxaplot.pdf"
@@ -44,21 +50,37 @@ rule usearch_openref:
 rule export_fasta:
     output: "{x}-seqs.fasta"
     input: "{x}-seqs.qza"
+    params: tempdir=lambda wc: wc["x"] + "-" + uuid.uuid4().hex
     shell:
         qiime + " tools export"
         " --input-path {input}"
-        " --output-path ."
-        " && mv dna-sequences.fasta {output}"
+        " --output-path {params.tempdir}"
+        " && mv {params.tempdir}/dna-sequences.fasta {output}"
+        " && rmdir {params.tempdir}"
 
 rule export_table:
+    """Shadow to prevent race condition with intermediate file"""
     output: "{x}-table.tsv"
     input: "{x}-table.qza"
+    params: tempdir=lambda wc: wc["x"] + "-" + uuid.uuid4().hex
     shell:
         qiime + " tools export"
         " --input-path {input}"
-        " --output-path ./"
-        " && biom convert -i feature-table.biom -o {output} --to-tsv"
-        " && rm feature-table.biom"
+        " --output-path tmp/{params.tempdir}"
+        " && biom convert -i tmp/{params.tempdir}/feature-table.biom -o {output} --to-tsv"
+        " && rm -rf tmp/{params.tempdir}"
+
+rule export_taxonomy:
+    """Taxonomy qza to tsv"""
+    output: "{x}-tax.tsv"
+    input: "{x}-tax.qza"
+    params: tempdir=lambda wc: wc["x"] + "-" + uuid.uuid4().hex
+    shell:
+        qiime + " tools export"
+        " --input-path {input}"
+        " --output-path {params.tempdir}"
+        " && mv {params.tempdir}/taxonomy.tsv {output}"
+        " && rmdir {params.tempdir}"
 
 rule rdp_tax_table:
     output: "{x}-rdp-taxtable.tsv"
@@ -69,16 +91,6 @@ rule ref_tax_table:
     output: "{x}ref-taxtable.tsv"
     input: table="{x}ref-table.tsv", tax="97_otu_taxonomy.txt"
     script: "scripts/tax-table.R"
-
-rule export_taxonomy:
-    """Taxonomy qza to tsv"""
-    output: "{x}-tax.tsv"
-    input: "{x}-tax.qza"
-    shell:
-        qiime + " tools export"
-        " --input-path {input}"
-        " --output-path ."
-        " && mv taxonomy.tsv {output}"
 
 rule rdp:
     output: "{x}-rdp-tax.qza"

@@ -56,8 +56,8 @@ tax <- read_tsv(
   mutate_at('otu', as.character)
 
 bind_rows(
-  exhaustive = exhaustive,
   default = default,
+  exhaustive = exhaustive,
   .id = 'search_type'
 ) %>%
   left_join(tax, by = 'otu') %>%

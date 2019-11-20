@@ -15,6 +15,7 @@ libraries:
 primers:
   forward: GTGCCAGCMGCCGCGGTAA
   reverse: GGACTACHVGGGTWTCTAAT
+  reverse-rc: ATTAGAWACCCBDGTAGTCC
 merge:
   min-overlap: 4
   percent-max-diff: 25

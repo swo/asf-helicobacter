@@ -5,14 +5,13 @@ configfile: "config.yaml"
 DIRECTIONS = ["forward", "reverse", "merge"]
 TRIMS = ["notrim", "trim"]
 GROUPS = expand("{direction}-{trim}", direction=DIRECTIONS, trim=TRIMS)
+OTU_PICKINGS = ["closedref", "openref", "rdp"]
 
 # library names from raw, input files
 LIBRARIES = config["libraries"].keys()
 
-ANALYSES = [
-    "closedref-taxtable.tsv", "openref-taxtable.tsv", "rdp-taxtable.tsv",
-    "openref-usearch.tsv"
-]
+ANALYSES = expand("{otu_picking}-{product}", otu_picking=OTU_PICKINGS, product=["taxtable.tsv", "taxaplot.pdf"]) + \
+    ["openref-usearch.tsv"]
 
 # note that current directory is mounted as /data in the container
 qiime = "docker run -t -i -v $(pwd):/data qiime2/core:2019.10 qiime"
@@ -113,6 +112,7 @@ rule closed_ref:
         " --i-sequences {input.seqs}"
         " --i-table {input.table}"
         " --i-reference-sequences {input.ref}"
+        " --p-strand both"
         " --p-perc-identity 0.97"
         " --o-clustered-table {output.table}"
         " --o-clustered-sequences {output.clusters}"
@@ -132,6 +132,7 @@ rule open_ref:
         " --i-sequences {input.seqs}"
         " --i-table {input.table}"
         " --i-reference-sequences {input.ref}"
+        " --p-strand both"
         " --p-perc-identity 0.97"
         " --o-clustered-table {output.table}"
         " --o-clustered-sequences {output.clusters}"
@@ -215,10 +216,11 @@ rule manifest:
     script: "scripts/write_manifest.py"
 
 rule trim_merge:
+    """Trim the forward and reverse primers (taking reverse complement)"""
     output: "merge-trim/{x}.fastq"
     input: "merge-notrim/{x}.fastq"
-    params: forward=config["primers"]["forward"], reverse=config["primers"]["reverse"]
-    shell: "cutadapt --front {params.forward} --adapter {params.reverse} --trimmed-only -o {output} {input}"
+    params: forward=config["primers"]["forward"], reverse_rc=config["primers"]["reverse-rc"]
+    shell: "cutadapt --front {params.forward}...{params.reverse_rc} --trimmed-only -o {output} {input}"
 
 rule merge:
     output: "merge-notrim/{x}.fastq"

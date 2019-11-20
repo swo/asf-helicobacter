@@ -2,8 +2,25 @@ source("~/.Rprofile")
 
 library(tidyverse)
 
+usearch <- function(input, output, accepts, rejects, id = 0.90) {
+  system(str_glue("usearch -usearch_global {input} -db {snakemake@input[['otus']]} -id {id} -strand both -blast6out {output} -maxaccepts {accepts} -maxrejects {rejects}"))
+}
+
+read_b6 <- function(fn) {
+  raw <- read_tsv(fn, col_names = FALSE)
+
+  if (nrow(raw) == 0) {
+    tibble(otu = character(0), id = numeric(0))
+  } else {
+    raw %>%
+      select(otu = X2, id = X3) %>%
+      mutate_at('otu', as.character)
+  }
+}
+
 table <- read_tsv(snakemake@input[['table']], skip = 1) %>%
-  rename(otu = `#OTU ID`)
+  rename(otu = `#OTU ID`) %>%
+  mutate_at('otu', as.character)
 
 top_otu <- table %>%
   gather('sample', 'counts', -otu) %>%
@@ -22,23 +39,21 @@ top_fasta_lines <- fasta[i: (i + 1)]
 top_fn <- tempfile()
 write_lines(top_fasta_lines, top_fn)
 
-usearch <- function(input, output, accepts, rejects) {
-  system(str_glue("usearch -usearch_global {input} -db {snakemake@input[['otus']]} -id 0.90 -strand both -blast6out {output} -maxaccepts {accepts} -maxrejects {rejects}"))
-}
-
 b6_fn <- tempfile()
 usearch(top_fn, b6_fn, 0, 0)
-exhaustive <- read_tsv(b6_fn, col_names = FALSE) %>%
-  select(otu = X2, id = X3)
+exhaustive <- read_b6(b6_fn)
 
 usearch(top_fn, b6_fn, 1, 8)
-default <- read_tsv(b6_fn, col_names = FALSE) %>%
-  select(otu = X2, id = X3)
+default <- read_b6(b6_fn)
 
 unlink(top_fn)
 unlink(b6_fn)
 
-tax <- read_tsv(snakemake@input[['taxonomy']], col_names = c('otu', 'taxonomy'))
+tax <- read_tsv(
+    snakemake@input[['taxonomy']],
+    col_names = c('otu', 'taxonomy')
+  ) %>%
+  mutate_at('otu', as.character)
 
 bind_rows(
   exhaustive = exhaustive,

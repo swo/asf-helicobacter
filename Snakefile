@@ -4,6 +4,7 @@ configfile: "config.yaml"
 
 DIRECTIONS = ["forward", "reverse", "merge"]
 TRIMS = ["notrim", "trim"]
+BLURS = ["derep", "deblur"]
 GROUPS = expand("{direction}-{trim}", direction=DIRECTIONS, trim=TRIMS)
 OTU_PICKINGS = ["closedref", "openref", "rdp"]
 
@@ -18,8 +19,9 @@ qiime = "docker run -t -i -v $(pwd):/data qiime2/core:2019.10 qiime"
 
 rule all:
     input:
-        expand("{group}-{analysis}", group=GROUPS, analysis=ANALYSES) + \
-        ["all-taxaplot.pdf"]
+        expand("{group}-{blur}-{analysis}", group=GROUPS, blur=BLURS, analysis=ANALYSES) + \
+        # ["all-taxaplot.pdf"]
+        []
 
 rule clean:
     shell:
@@ -84,7 +86,7 @@ rule export_taxonomy:
 
 rule rdp_tax_table:
     output: "{x}-rdp-taxtable.tsv"
-    input: table="{x}-deblur-table.tsv", tax="{x}-rdp-tax.tsv"
+    input: table="{x}-table.tsv", tax="{x}-rdp-tax.tsv"
     script: "scripts/tax-table.R"
 
 rule ref_tax_table:
@@ -94,11 +96,13 @@ rule ref_tax_table:
 
 rule rdp:
     output: "{x}-rdp-tax.qza"
-    input: reads="{x}-deblur-seqs.qza", classifier="rdp-classifier.qza"
+    input: reads="{x}-seqs.qza", classifier="rdp-classifier.qza"
     shell:
         qiime + " feature-classifier classify-sklearn"
         " --i-classifier {input.classifier}"
         " --i-reads {input.reads}"
+        " --verbose"
+        " --p-pre-dispatch 1"
         " --o-classification {output}"
 
 rule download_classifier:
@@ -116,8 +120,8 @@ rule closed_ref:
         clusters = "{x}-closedref-clustered-seqs.qza",
         unmatched = "{x}-closedref-unmatched-seqs.qza"
     input:
-        seqs = "{x}-deblur-seqs.qza",
-        table = "{x}-deblur-table.qza",
+        seqs = "{x}-seqs.qza",
+        table = "{x}-table.qza",
         ref = "97_otus.qza"
     shell:
         qiime + " vsearch cluster-features-closed-reference"
@@ -136,8 +140,8 @@ rule open_ref:
         clusters = "{x}-openref-clustered-seqs.qza",
         seqs = "{x}-openref-newref-seqs.qza"
     input:
-        seqs = "{x}-deblur-seqs.qza",
-        table = "{x}-deblur-table.qza",
+        seqs = "{x}-seqs.qza",
+        table = "{x}-table.qza",
         ref = "97_otus.qza"
     shell:
         qiime + " vsearch cluster-features-open-reference"
@@ -201,6 +205,17 @@ rule deblur:
         " --o-table {output.table}"
         " --o-representative-sequences {output.seqs}"
         " --o-stats {output.stats}"
+
+rule derep:
+    output:
+        table = "{x}-derep-table.qza",
+        seqs = "{x}-derep-seqs.qza"
+    input: "{x}-filter-seqs.qza"
+    shell:
+        qiime + " vsearch dereplicate-sequences"
+        " --i-sequences {input}"
+        " --o-dereplicated-table {output.table}"
+        " --o-dereplicated-sequences {output.seqs}"
 
 rule filter:
     output: seqs="{x}-filter-seqs.qza", stats="{x}-filter-stats.qza"

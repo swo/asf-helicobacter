@@ -101,8 +101,7 @@ rule rdp:
         qiime + " feature-classifier classify-sklearn"
         " --i-classifier {input.classifier}"
         " --i-reads {input.reads}"
-        " --verbose"
-        " --p-pre-dispatch 1"
+        " --p-confidence 0.8"
         " --o-classification {output}"
 
 rule download_classifier:

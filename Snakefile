@@ -29,7 +29,7 @@ rule clean:
         " " + " ".join(expand("{group}/*", group=GROUPS))
 
 rule taxa_plot_all:
-    output: "all-taxaplot.pdf"
+    output: plot="all-taxaplot.pdf", table="all-taxaplot-table.tsv"
     input: expand("{direction}-{trim}-{picking}-taxtable.tsv", direction=DIRECTIONS, trim=TRIMS, picking=OTU_PICKINGS)
     script: "scripts/taxa-plot-all.R"
 

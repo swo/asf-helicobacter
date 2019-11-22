@@ -31,15 +31,16 @@ discarded <- data %>%
   ungroup() %>%
   filter(counts > 0)
 
-plot <- data %>%
+plot_data <- data %>%
   bind_rows(discarded) %>%
+  # group up relative abundances
   group_by(direction, trim, picking, sample) %>%
   mutate(ra = counts / sum(counts)) %>%
   ungroup() %>%
+  # group OTUs into taxonomies
   mutate(
     tax = case_when(
       Taxon == 'Discarded' ~ 'Discarded',
-      ra <= 0.015 ~ 'Other',
       picking == 'openref' & is.na(Taxon) & str_length(otu) == 32 ~ 'New open-ref OTU',
       genus != 'g__' ~ genus,
       family != 'f__' ~ family,
@@ -49,13 +50,23 @@ plot <- data %>%
       kingdom != 'k__' ~ kingdom
     )
   ) %>%
+  # sum up the r.a.'s of each taxonomy
   group_by(direction, trim, picking, sample, tax) %>%
   summarize_at('ra', sum) %>%
   ungroup() %>%
+  # and *now* look for low taxonomies
+  group_by(direction, trim, picking, sample) %>%
+  mutate(tax = if_else(ra <= 0.015, 'Other', tax)) %>%
+  group_by(direction, trim, picking, sample, tax) %>%
+  summarize_at('ra', sum) %>%
+  ungroup()
+
+plot <- plot_data %>%
   ggplot(aes(interaction(direction, trim, picking), ra, fill = fct_reorder(tax, -ra))) +
   facet_wrap(~ sample) +
   geom_col() +
   coord_flip() +
   theme_minimal()
 
-ggsave(snakemake@output[[1]])
+ggsave(snakemake@output[['plot']])
+write_tsv(plot_data, snakemake@output[['table']])

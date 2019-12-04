@@ -18,10 +18,7 @@ ANALYSES = expand("{otu_picking}-{product}", otu_picking=OTU_PICKINGS, product=[
 qiime = "docker run -t -i -v $(pwd):/data qiime2/core:2019.10 qiime"
 
 rule all:
-    input:
-        expand("{group}-{blur}-{analysis}", group=GROUPS, blur=BLURS, analysis=ANALYSES) + \
-        # ["all-taxaplot.pdf"]
-        []
+    input: expand("{direction}-{trim}-{blur}-{product}", direction=DIRECTIONS, trim=TRIMS, blur=BLURS, product=["seqs.fasta", "table.tsv"])
 
 rule clean:
     shell:

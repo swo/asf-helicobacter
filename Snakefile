@@ -6,7 +6,7 @@ DIRECTIONS = ["forward", "reverse", "merge"]
 TRIMS = ["notrim", "trim"]
 BLURS = ["derep", "deblur"]
 GROUPS = expand("{direction}-{trim}", direction=DIRECTIONS, trim=TRIMS)
-OTU_PICKINGS = ["closedref", "openref", "rdp"]
+OTU_PICKINGS = ["closedref", "openref", "rdp", "uclust"]
 
 # library names from raw, input files
 LIBRARIES = config["libraries"].keys()
@@ -24,7 +24,6 @@ rule clean:
     shell:
         "rm -rf"
         " *.txt *.qza *.biom *.tsv *.fasta *.b6 *.log *.udb *.tar.gz *.pdf" + \
-        " gg_13_8_otus/"
         " " + " ".join(expand("{group}/*", group=GROUPS))
 
 rule taxa_plot_all:
@@ -80,6 +79,11 @@ rule export_taxonomy:
         " --output-path {params.tempdir}"
         " && mv {params.tempdir}/taxonomy.tsv {output}"
         " && rmdir {params.tempdir}"
+
+rule uclust_tax_table:
+    output: "{x}-uclust-taxtable.tsv"
+    input: table="{x}-uclust-table.tsv", tax="97_otu_taxonomy.txt"
+    script: "scripts/tax-table.R"
 
 rule rdp_tax_table:
     output: "{x}-rdp-taxtable.tsv"

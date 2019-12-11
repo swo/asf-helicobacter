@@ -1,5 +1,11 @@
 # ASF-*Helicobacter*
 
+## To do
+
+- Reverse complement the reverse reads, so we don't have to look at both read directions
+    - Use BioPython
+- Parse the Qiime 1 closed- and open-ref results
+
 ## Overview of files
 
 There are 6 input sets of sequences:

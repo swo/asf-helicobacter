@@ -20,12 +20,9 @@ merge:
   min-overlap: 4
   percent-max-diff: 25
 deblur-trim-length:
-  forward-notrim: 150
-  forward-trim: 131
-  reverse-notrim: 150
-  reverse-trim: 130
-  merge-notrim: 292
-  merge-trim: 253
+  forward: 131
+  reverse: 130
+  merge: 253
 taxonomy:
   url: ftp://greengenes.microbio.me/greengenes_release/gg_13_5/gg_13_8_otus.tar.gz
   md5: cdda8508a94a9c49ca8114a3d84ef9a2

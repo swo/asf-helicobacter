@@ -2,27 +2,23 @@
 
 ## To do
 
-- Reverse complement the reverse reads, so we don't have to look at both read directions
-    - Use BioPython
-- Parse the Qiime 1 closed- and open-ref results
+- Figure out how to get the right number of discards, using deblur table
 
 ## Overview of files
 
-There are 6 input sets of sequences:
+There are 3 inputs: forward, reverse, merged.
 
-- Forward, reverse, and merged
-- Trimmed and untrimmed
-
-Each of this 6 set of sequences is cleaned:
+Each of these 3 are cleaned:
 
 - Quality filtering
 - Deblur
 
-Then, OTUs are picked with one of 3 methods:
+Then, OTUs are picked with one of 4 methods (all using Greengenes 13\_8):
 
-- Closed reference (Greengenes 13\_8)
-- Open reference
-- RDP
+- Qiime 1 closed reference
+- Qiime 1 open reference
+- Qiime 2 closed reference
+- Qiime 2 open
 
 ## Outputs
 

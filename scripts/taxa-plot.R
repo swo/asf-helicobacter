@@ -1,37 +1,50 @@
 library(tidyverse)
 
-short_tax <- function(x) {
-  x %>%
-    # remove species
-    str_replace('s__\\S*$', '') %>%
-    # get only non-empty levels
-    str_extract_all('[kpcofg]__\\S*') %>%
-    first() %>%
-    last()
-}
+data <- tibble(
+  fn = snakemake@input,
+  fields = map(fn, ~ str_split_fixed(., '-', 4)),
+  direction = map_chr(fields, ~ .[[1]]),
+  pick = map_chr(fields, ~ .[[2]]),
+  data = map(fn, read_tsv)
+) %>%
+  select(direction, pick, data) %>%
+  unnest(cols = 'data') %>%
+  separate(sample, c('direction2', 'trim2', 'sample'))
 
-raw <- read_tsv(snakemake@input[[1]])
+with(data, {
+  stopifnot(all(direction == direction2))
+  stopifnot(all(trim2 == "trim"))
+})
 
-tax <- raw %>%
-  select(Taxon) %>%
-  distinct() %>%
-  mutate(tax = map_chr(Taxon, short_tax))
+# discarded <- data %>%
+#   group_by(direction, sample) %>%
+#   summarize_at('counts', sum) %>%
+#   mutate(
+#     short_tax = 'discarded',
+#     counts = max(counts) - counts
+#   ) %>%
+#   ungroup() %>%
+#   filter(counts > 0)
 
-plot_data <- raw %>%
-  left_join(tax, by = 'Taxon') %>%
-  group_by(sample) %>%
-  mutate(ra = counts / sum(counts)) %>%
+plot_data <- data %>%
+  # bind_rows(discarded) %>%
+  # group up relative abundances
+  group_by(direction, pick, sample) %>%
   mutate(
-    tax = case_when(
-      ra <= 0.015 ~ 'Other',
-      is.na(tax) & str_length(otu) == 32 ~ 'New open-ref OTU',
-      TRUE ~ tax
-    )
-  )
+    ra = counts / sum(counts),
+    short_tax = if_else(ra <= 0.05, 'Other', short_tax)
+  ) %>%
+  group_by(direction, pick, sample, short_tax) %>%
+  summarize_at('ra', sum) %>%
+  ungroup()
 
 plot <- plot_data %>%
-  ggplot(aes(sample, ra, fill = fct_reorder(tax, -ra))) +
+  filter(sample %in% c("heli5", "noheli5")) %>%
+  ggplot(aes(interaction(direction, pick), ra, fill = fct_reorder(short_tax, -ra))) +
+  facet_wrap(~ sample) +
   geom_col() +
-  coord_flip()
+  coord_flip() +
+  theme_minimal()
 
-ggsave(snakemake@output[[1]])
+ggsave(snakemake@output[["plot"]])
+write_tsv(plot_data, snakemake@output[["data"]])

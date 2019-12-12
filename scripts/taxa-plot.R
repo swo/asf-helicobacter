@@ -16,18 +16,18 @@ with(data, {
   stopifnot(all(trim2 == "trim"))
 })
 
-# discarded <- data %>%
-#   group_by(direction, sample) %>%
-#   summarize_at('counts', sum) %>%
-#   mutate(
-#     short_tax = 'discarded',
-#     counts = max(counts) - counts
-#   ) %>%
-#   ungroup() %>%
-#   filter(counts > 0)
+discarded <- data %>%
+  group_by(direction, sample, pick) %>%
+  summarize_at("counts", sum) %>%
+  mutate(
+    short_tax = "discarded",
+    counts = max(counts) - counts
+  ) %>%
+  ungroup() %>%
+  filter(counts > 0)
 
 plot_data <- data %>%
-  # bind_rows(discarded) %>%
+  bind_rows(discarded) %>%
   # group up relative abundances
   group_by(direction, pick, sample) %>%
   mutate(
@@ -35,7 +35,7 @@ plot_data <- data %>%
     short_tax = if_else(ra <= 0.05, 'Other', short_tax)
   ) %>%
   group_by(direction, pick, sample, short_tax) %>%
-  summarize_at('ra', sum) %>%
+  summarize_at(c("counts", "ra"), sum) %>%
   ungroup()
 
 plot <- plot_data %>%

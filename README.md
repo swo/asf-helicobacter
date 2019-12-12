@@ -2,8 +2,6 @@
 
 ## To do
 
-- Figure out how to get the right number of discards, using deblur table
-
 ## Overview of files
 
 There are 3 inputs: forward, reverse, merged.

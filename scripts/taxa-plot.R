@@ -1,4 +1,5 @@
 library(tidyverse)
+library(RColorBrewer)
 
 data <- tibble(
   fn = snakemake@input,
@@ -30,20 +31,34 @@ plot_data <- data %>%
   bind_rows(discarded) %>%
   # group up relative abundances
   group_by(direction, pick, sample) %>%
-  mutate(
-    ra = counts / sum(counts),
-    short_tax = if_else(ra <= 0.05, 'Other', short_tax)
-  ) %>%
+  mutate(ra = counts / sum(counts)) %>%
+  ungroup()
+
+others <- plot_data %>%
+  group_by(short_tax) %>%
+  summarize(is_other = max(ra) < 0.10)
+
+plot_data <- plot_data %>%
+  left_join(others, by = "short_tax") %>%
+  mutate(short_tax = if_else(is_other, "Other", short_tax)) %>%
+  select(-is_other) %>%
   group_by(direction, pick, sample, short_tax) %>%
   summarize_at(c("counts", "ra"), sum) %>%
   ungroup()
+
+tax_names <- Filter(function(x) str_detect(x, "__"), unique(plot_data$short_tax))
+colors <- c(
+  setNames(brewer.pal(length(tax_names), "Paired"), tax_names),
+  "discarded" = "black", "no_taxonomy" = "gray50", "Other" = "white"
+)
 
 plot <- plot_data %>%
   filter(sample %in% c("heli5", "noheli5")) %>%
   ggplot(aes(interaction(direction, pick), ra, fill = fct_reorder(short_tax, -ra))) +
   facet_wrap(~ sample) +
-  geom_col() +
+  geom_col(color = "black") +
   coord_flip() +
+  scale_fill_manual(values = colors) +
   theme_minimal()
 
 ggsave(snakemake@output[["plot"]])

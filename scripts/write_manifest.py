@@ -7,7 +7,7 @@ with open(snakemake.output[0], "w") as f:
     writer.writeheader()
 
     for filepath in snakemake.input:
-        match = re.match("(.*)/(.*)_R1.fastq", filepath)
+        match = re.match("(.*)/(.*).fastq", filepath)
         assert group == match.group(1)
 
         library = match.group(2)

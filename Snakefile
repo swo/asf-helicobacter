@@ -3,49 +3,58 @@ import uuid
 configfile: "config.yaml"
 
 DIRECTIONS = ["forward", "reverse", "merge"]
-TRIMS = ["notrim", "trim"]
-GROUPS = expand("{direction}-{trim}", direction=DIRECTIONS, trim=TRIMS)
-OTU_PICKINGS = ["closedref", "openref", "rdp"]
+PICKS = ["q2closed", "q2open", "q1closed", "q1open"]
 
 # library names from raw, input files
 LIBRARIES = config["libraries"].keys()
-
-ANALYSES = expand("{otu_picking}-{product}", otu_picking=OTU_PICKINGS, product=["taxtable.tsv", "taxaplot.pdf"]) + \
-    ["openref-usearch.tsv"]
 
 # note that current directory is mounted as /data in the container
 qiime = "docker run -t -i -v $(pwd):/data qiime2/core:2019.10 qiime"
 
 rule all:
+    input: expand("{direction}-{pick}-{product}", pick=PICKS, direction=DIRECTIONS, product=["taxtable.tsv"])
+
+# rule clean:
+#     shell:
+#         "rm -rf"
+#         " *.txt *.qza *.biom *.tsv *.fasta *.b6 *.log *.udb *.tar.gz *.pdf" + \
+#         " " + " ".join(expand("{group}/*", group=GROUPS))
+
+rule all_exhaustive:
+    output: "allhits.tsv"
     input:
-        expand("{group}-{analysis}", group=GROUPS, analysis=ANALYSES) + \
-        ["all-taxaplot.pdf"]
+        hits=expand("{direction}-hits.b6", direction=DIRECTIONS),
+        tables=expand("{direction}-deblur-table.tsv", direction=DIRECTIONS),
+        tax="97-otu-shorttax.txt"
+    script: "scripts/compile-hits.R"
 
-rule clean:
+rule exhaustive:
+    output: "{x}-hits.b6"
+    input:
+        seqs="{x}-deblur-seqs.fasta",
+        db="97_otus.udb"
     shell:
-        "rm -rf"
-        " *.txt *.qza *.biom *.tsv *.fasta *.b6 *.log *.udb *.tar.gz *.pdf" + \
-        " gg_13_8_otus/"
-        " " + " ".join(expand("{group}/*", group=GROUPS))
-
-rule taxa_plot_all:
-    output: plot="all-taxaplot.pdf", table="all-taxaplot-table.tsv"
-    input: expand("{direction}-{trim}-{picking}-taxtable.tsv", direction=DIRECTIONS, trim=TRIMS, picking=OTU_PICKINGS)
-    script: "scripts/taxa-plot-all.R"
+        "usearch -usearch_global {input.seqs}"
+        " -db {input.db}"
+        " -blast6out {output}"
+        " -id 0.85 -strand both"
+        " -maxaccepts 0 -maxrejects 0"
 
 rule taxa_plot:
-    output: "{x}-taxaplot.pdf"
-    input: "{x}-taxtable.tsv"
+    output:
+        plot="taxaplot.pdf",
+        data="taxaplot.tsv"
+    input: expand("{direction}-{pick}-taxtable.tsv", direction=DIRECTIONS, pick=PICKS)
     script: "scripts/taxa-plot.R"
 
-rule usearch_openref:
-    output: "{x}-openref-usearch.tsv"
-    input:
-        table="{x}-openref-table.tsv",
-        seqs="{x}-openref-newref-seqs.fasta",
-        otus="97_otus.udb",
-        taxonomy="97_otu_taxonomy.txt"
-    script: "scripts/openref-usearch.R"
+# rule usearch_openref:
+#     output: "{x}-openref-usearch.tsv"
+#     input:
+#         table="{x}-openref-table.tsv",
+#         seqs="{x}-openref-newref-seqs.fasta",
+#         otus="97_otus.udb",
+#         taxonomy="97-otu-tax.tsv"
+#     script: "scripts/openref-usearch.R"
 
 rule export_fasta:
     output: "{x}-seqs.fasta"
@@ -59,7 +68,7 @@ rule export_fasta:
         " && rmdir {params.tempdir}"
 
 rule export_table:
-    """Shadow to prevent race condition with intermediate file"""
+    """Export to temporary directory to prevent race"""
     output: "{x}-table.tsv"
     input: "{x}-table.qza"
     params: tempdir=lambda wc: wc["x"] + "-" + uuid.uuid4().hex
@@ -70,55 +79,68 @@ rule export_table:
         " && biom convert -i tmp/{params.tempdir}/feature-table.biom -o {output} --to-tsv"
         " && rm -rf tmp/{params.tempdir}"
 
-rule export_taxonomy:
-    """Taxonomy qza to tsv"""
-    output: "{x}-tax.tsv"
-    input: "{x}-tax.qza"
-    params: tempdir=lambda wc: wc["x"] + "-" + uuid.uuid4().hex
+
+# Make Qiime 2 taxonomy tables -----------------------------------------
+
+rule q1open_tax_table:
+    output: "{x}-q1open-taxtable.tsv"
+    input:
+        otu_map="{x}-q1open-otus.txt",
+        table="{x}-deblur-table.tsv",
+        tax="{x}-q1open-shorttax.txt"
     shell:
-        qiime + " tools export"
-        " --input-path {input}"
-        " --output-path {params.tempdir}"
-        " && mv {params.tempdir}/taxonomy.tsv {output}"
-        " && rmdir {params.tempdir}"
+        "scripts/q1-tax-table.R"
+        " --otu_map {input.otu_map}"
+        " --tax {input.tax}"
+        " --table {input.table}"
+        " --output {output}"
 
-rule rdp_tax_table:
-    output: "{x}-rdp-taxtable.tsv"
-    input: table="{x}-deblur-table.tsv", tax="{x}-rdp-tax.tsv"
-    script: "scripts/tax-table.R"
-
-rule ref_tax_table:
-    output: "{x}ref-taxtable.tsv"
-    input: table="{x}ref-table.tsv", tax="97_otu_taxonomy.txt"
-    script: "scripts/tax-table.R"
-
-rule rdp:
-    output: "{x}-rdp-tax.qza"
-    input: reads="{x}-deblur-seqs.qza", classifier="rdp-classifier.qza"
+rule q1closed_tax_table:
+    output: "{x}-q1closed-taxtable.tsv"
+    input:
+        otu_map="{x}-q1closed-otus.txt",
+        table="{x}-deblur-table.tsv",
+        tax="97-otu-shorttax.txt"
     shell:
-        qiime + " feature-classifier classify-sklearn"
-        " --i-classifier {input.classifier}"
-        " --i-reads {input.reads}"
-        " --p-confidence 0.8"
-        " --o-classification {output}"
+        "scripts/q1-tax-table.R"
+        " --otu_map {input.otu_map}"
+        " --tax {input.tax}"
+        " --table {input.table}"
+        " --output {output}"
 
-rule download_classifier:
-    output: "rdp-classifier.qza"
-    params:
-        url=config["classifier"]["url"],
-        md5=config["classifier"]["md5"]
-    shell:
-        "wget {params.url} -O {output}"
-        " && echo '{params.md5}  {params.md5}' | md5sum "
+rule short_tax:
+    output: "{x}-shorttax.txt"
+    input: "{x}-tax.txt"
+    shell: "scripts/clean-tax-map.R -i {input} -o {output}"
+
+# Make Qiime 2 taxonomy tables -----------------------------------------
+
+rule q2open_tax_table:
+    output: "{x}-q2open-taxtable.tsv"
+    input: table="{x}-q2open-table.tsv", tax="97-otu-shorttax.txt"
+    shell: "scripts/q2-tax-table.R --tax {input.tax} --table {input.table} --output {output}"
+
+rule q2closed_tax_table:
+    output: "{x}-q2closed-taxtable.tsv"
+    input: table="{x}-q2closed-table.tsv", tax="97-otu-shorttax.txt"
+    shell: "scripts/q2-tax-table.R --tax {input.tax} --table {input.table} --output {output}"
+
+# Qiime1 OTU picking --------------------------------------------------
+
+rule q1:
+    output: expand("{direction}-{pick}-{product}", direction=DIRECTIONS, pick=["q1closed", "q1open"], product=["otus.txt", "tax.txt"])
+    shell: "echo 'Run Qiime1 scripts'"
+
+# Qiime2 OTU picking --------------------------------------------------
 
 rule closed_ref:
     output:
-        table = "{x}-closedref-table.qza",
-        clusters = "{x}-closedref-clustered-seqs.qza",
-        unmatched = "{x}-closedref-unmatched-seqs.qza"
+        table = "{x}-q1closed-table.qza",
+        clusters = "{x}-q1closed-clustered-seqs.qza",
+        unmatched = "{x}-q1closed-unmatched-seqs.qza"
     input:
-        seqs = "{x}-deblur-seqs.qza",
-        table = "{x}-deblur-table.qza",
+        seqs = "{x}-seqs.qza",
+        table = "{x}-table.qza",
         ref = "97_otus.qza"
     shell:
         qiime + " vsearch cluster-features-closed-reference"
@@ -133,12 +155,12 @@ rule closed_ref:
 
 rule open_ref:
     output:
-        table = "{x}-openref-table.qza",
-        clusters = "{x}-openref-clustered-seqs.qza",
-        seqs = "{x}-openref-newref-seqs.qza"
+        table = "{x}-q2open-table.qza",
+        clusters = "{x}-q2open-clustered-seqs.qza",
+        seqs = "{x}-q2open-newref-seqs.qza"
     input:
-        seqs = "{x}-deblur-seqs.qza",
-        table = "{x}-deblur-table.qza",
+        seqs = "{x}-seqs.qza",
+        table = "{x}-table.qza",
         ref = "97_otus.qza"
     shell:
         qiime + " vsearch cluster-features-open-reference"
@@ -161,7 +183,7 @@ rule import_reference_otus:
         " --type 'FeatureData[Sequence]'"
 
 rule extract_reference_taxonomy:
-    output: "97_otu_taxonomy.txt"
+    output: "97-otu-tax.txt"
     input: "gg_13_8_otus.tar.gz"
     params: archive="gg_13_8_otus/taxonomy/97_otu_taxonomy.txt"
     shell: "tar -O -f {input} -x {params.archive} > {output}"
@@ -184,7 +206,7 @@ rule download_reference:
         md5=config["taxonomy"]["md5"]
     shell:
         "wget {params.url} -O {output}"
-        " && echo '{params.md5}  {params.md5}' | md5sum "
+        " && echo '{params.md5}  {output}' | md5sum --check"
 
 rule deblur:
     output:
@@ -204,7 +226,9 @@ rule deblur:
         " --o-stats {output.stats}"
 
 rule filter:
-    output: seqs="{x}-filter-seqs.qza", stats="{x}-filter-stats.qza"
+    output:
+        seqs="{x}-filter-seqs.qza",
+        stats="{x}-filter-stats.qza"
     input: "{x}-demux-seqs.qza"
     shell:
         qiime + " quality-filter q-score"
@@ -224,7 +248,7 @@ rule demux:
 
 rule manifest:
     output: "{x}-manifest.txt"
-    input: expand("{{x}}/{library}_R1.fastq", library=LIBRARIES)
+    input: expand("{{x}}-trim/{library}_R1.fastq", library=LIBRARIES)
     params: libraries=config["libraries"]
     script: "scripts/write_manifest.py"
 
@@ -237,7 +261,9 @@ rule trim_merge:
 
 rule merge:
     output: "merge-notrim/{x}.fastq"
-    input: forward="forward-notrim/{x}.fastq", reverse="reverse-notrim/{x}.fastq"
+    input:
+        forward="raw/{x}_R1.fastq",
+        reverse="raw/{x}_R2.fastq"
     params:
         min_overlap=config["merge"]["min-overlap"],
         percent_max_diff=config["merge"]["percent-max-diff"]
@@ -245,22 +271,12 @@ rule merge:
 
 rule trim_forward:
     output: "forward-trim/{x}.fastq"
-    input: "forward-notrim/{x}.fastq"
+    input: "raw/{x}_R1.fastq"
     params: primer=config["primers"]["forward"]
     shell: "cutadapt --front {params.primer} --trimmed-only -o {output} {input}"
 
 rule trim_reverse:
     output: "reverse-trim/{x}.fastq"
-    input: "reverse-notrim/{x}.fastq"
+    input: "raw/{x}_R2.fastq"
     params: primer=config["primers"]["reverse"]
     shell: "cutadapt --front {params.primer} --trimmed-only -o {output} {input}"
-
-rule copy_reverse:
-    output: "reverse-notrim/{x}_R1.fastq"
-    input: "raw/{x}_R2.fastq"
-    shell: "cp {input} {output}"
-
-rule copy_forward:
-    output: "forward-notrim/{x}_R1.fastq"
-    input: "raw/{x}_R1.fastq"
-    shell: "cp {input} {output}"

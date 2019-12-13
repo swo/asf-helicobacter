@@ -1,22 +1,22 @@
 # ASF-*Helicobacter*
 
+## To do
+
 ## Overview of files
 
-There are 6 input sets of sequences:
+There are 3 inputs: forward, reverse, merged.
 
-- Forward, reverse, and merged
-- Trimmed and untrimmed
-
-Each of this 6 set of sequences is cleaned:
+Each of these 3 are cleaned:
 
 - Quality filtering
 - Deblur
 
-Then, OTUs are picked with one of 3 methods:
+Then, OTUs are picked with one of 4 methods (all using Greengenes 13\_8):
 
-- Closed reference (Greengenes 13\_8)
-- Open reference
-- RDP
+- Qiime 1 closed reference
+- Qiime 1 open reference
+- Qiime 2 closed reference
+- Qiime 2 open
 
 ## Outputs
 

@@ -20,6 +20,26 @@ rule all:
 #         " *.txt *.qza *.biom *.tsv *.fasta *.b6 *.log *.udb *.tar.gz *.pdf" + \
 #         " " + " ".join(expand("{group}/*", group=GROUPS))
 
+rule all_exhaustive:
+    output: "allhits.tsv"
+    input:
+        hits=expand("{direction}-hits.b6", direction=DIRECTIONS),
+        tables=expand("{direction}-deblur-table.tsv", direction=DIRECTIONS),
+        tax="97-otu-shorttax.txt"
+    script: "scripts/compile-hits.R"
+
+rule exhaustive:
+    output: "{x}-hits.b6"
+    input:
+        seqs="{x}-deblur-seqs.fasta",
+        db="97_otus.udb"
+    shell:
+        "usearch -usearch_global {input.seqs}"
+        " -db {input.db}"
+        " -blast6out {output}"
+        " -id 0.85 -strand both"
+        " -maxaccepts 0 -maxrejects 0"
+
 rule taxa_plot:
     output:
         plot="taxaplot.pdf",

@@ -38,7 +38,7 @@ def open_reference(prefix, force=False):
     print("Dest files not found:", dest1, dest2)
 
     with tempfile.TemporaryDirectory() as tmp_dir:
-        command = ["pick_open_reference_otus.py", "-f", "-p", "q1-params.config", "--min_otu_size", "1", "-i", "../{}-deblur-seqs.fasta".format(prefix), "-o", tmp_dir]
+        command = ["pick_open_reference_otus.py", "-f", "-p", "q1-params.config", "--min_otu_size", "1", "--suppress_align_and_tree", "-i", "../{}-deblur-seqs.fasta".format(prefix), "-o", tmp_dir]
 
         subprocess.call(command)
 

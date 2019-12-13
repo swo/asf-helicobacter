@@ -44,17 +44,37 @@ plot_data <- plot_data %>%
   select(-is_other) %>%
   group_by(direction, pick, sample, short_tax) %>%
   summarize_at(c("counts", "ra"), sum) %>%
-  ungroup()
+  ungroup() %>%
+  mutate(short_tax = case_when(
+    .$pick %in% c("q1closed", "q1open") & .$short_tax == "no_taxonomy" ~ "discarded",
+    TRUE ~ .$short_tax
+  ))
 
-tax_names <- Filter(function(x) str_detect(x, "__"), unique(plot_data$short_tax))
+display_levels <- c(
+  "g__Parabacteroides",
+  "g__Mucispirillum",
+  "discarded",
+  "no_taxonomy",
+  "g__Helicobacter",
+  "g__Flexispira",
+  "g__Turicibacter",
+  "f__Lachnospiraceae",
+  "f__Bacillaceae",
+  "f__[Mogibacteriaceae]",
+  "Other"
+)
+
+tax_names <- Filter(function(x) str_detect(x, "__"), display_levels)
 colors <- c(
   setNames(brewer.pal(length(tax_names), "Paired"), tax_names),
   "discarded" = "black", "no_taxonomy" = "gray50", "Other" = "white"
 )
 
+
 plot <- plot_data %>%
   filter(sample %in% c("heli5", "noheli5")) %>%
-  ggplot(aes(interaction(direction, pick), ra, fill = fct_reorder(short_tax, -ra))) +
+  mutate(short_tax = factor(short_tax, levels = display_levels)) %>%
+  ggplot(aes(interaction(direction, pick), ra, fill = short_tax)) +
   facet_wrap(~ sample) +
   geom_col(color = "black") +
   coord_flip() +

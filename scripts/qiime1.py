@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
-import subprocess, tempfile, os.path
+import subprocess, tempfile, os.path, shutil
 
 def closed_reference(prefix, force=False):
     dest = "../{}-q1closed-otus.txt".format(prefix)
 
     if os.path.exists(dest) and not force:
+        print("Dest file exists, stopping")
         return None
 
     print("Dest file not found:", dest)
@@ -23,8 +24,7 @@ def closed_reference(prefix, force=False):
         subprocess.call(command)
 
         src = os.path.join(tmp_dir, "uclust_ref_picked_otus", "{}-deblur-seqs_otus.txt".format(prefix))
-        command = ["mv", src, dest]
-        subprocess.call(command)
+        shutil.move(src, dest)
 
     return dest
 
@@ -33,6 +33,7 @@ def open_reference(prefix, force=False):
     dest2 = "../{}-q1open-tax.txt".format(prefix)
 
     if os.path.exists(dest1) and os.path.exists(dest2) and not force:
+        print("Dest files exists, stopping")
         return None
 
     print("Dest files not found:", dest1, dest2)
@@ -43,10 +44,10 @@ def open_reference(prefix, force=False):
         subprocess.call(command)
 
         src1 = os.path.join(tmp_dir, "final_otu_map.txt")
-        subprocess.call(["mv", src1, dest1])
+        shutil.move(src1, dest1)
 
         src2 = os.path.join(tmp_dir, "uclust_assigned_taxonomy", "rep_set_tax_assignments.txt")
-        subprocess.call(["mv", src2, dest2])
+        shutil.move(src2, dest2)
 
     return (dest1, dest2)
 

@@ -47,15 +47,6 @@ rule taxa_plot:
     input: expand("{direction}-{pick}-taxtable.tsv", direction=DIRECTIONS, pick=PICKS)
     script: "scripts/taxa-plot.R"
 
-# rule usearch_openref:
-#     output: "{x}-openref-usearch.tsv"
-#     input:
-#         table="{x}-openref-table.tsv",
-#         seqs="{x}-openref-newref-seqs.fasta",
-#         otus="97_otus.udb",
-#         taxonomy="97-otu-tax.tsv"
-#     script: "scripts/openref-usearch.R"
-
 rule export_fasta:
     output: "{x}-seqs.fasta"
     input: "{x}-seqs.qza"
@@ -80,7 +71,7 @@ rule export_table:
         " && rm -rf tmp/{params.tempdir}"
 
 
-# Make Qiime 2 taxonomy tables -----------------------------------------
+# Make Qiime 1 taxonomy tables -----------------------------------------
 
 rule q1open_tax_table:
     output: "{x}-q1open-taxtable.tsv"
@@ -133,14 +124,14 @@ rule q1:
 
 # Qiime2 OTU picking --------------------------------------------------
 
-rule closed_ref:
+rule q2_closed_ref:
     output:
-        table = "{x}-q1closed-table.qza",
-        clusters = "{x}-q1closed-clustered-seqs.qza",
-        unmatched = "{x}-q1closed-unmatched-seqs.qza"
+        table = "{x}-q2closed-table.qza",
+        clusters = "{x}-q2closed-clustered-seqs.qza",
+        unmatched = "{x}-q2closed-unmatched-seqs.qza"
     input:
-        seqs = "{x}-seqs.qza",
-        table = "{x}-table.qza",
+        seqs = "{x}-deblur-seqs.qza",
+        table = "{x}-deblur-table.qza",
         ref = "97_otus.qza"
     shell:
         qiime + " vsearch cluster-features-closed-reference"
@@ -153,14 +144,14 @@ rule closed_ref:
         " --o-clustered-sequences {output.clusters}"
         " --o-unmatched-sequences {output.unmatched}"
 
-rule open_ref:
+rule q2_open_ref:
     output:
         table = "{x}-q2open-table.qza",
         clusters = "{x}-q2open-clustered-seqs.qza",
         seqs = "{x}-q2open-newref-seqs.qza"
     input:
-        seqs = "{x}-seqs.qza",
-        table = "{x}-table.qza",
+        seqs = "{x}-deblur-seqs.qza",
+        table = "{x}-deblur-table.qza",
         ref = "97_otus.qza"
     shell:
         qiime + " vsearch cluster-features-open-reference"
